@@ -172,32 +172,78 @@ class PipelineRunner:
 
             await self.stat("shape", f"{df.shape[0]} × {df.shape[1]}")
 
-            # ── STEP 1: Domain Sanity + Leakage (parallel) ──
-            await self.log("[dim]─── Domain Sanity + Drift ────────────────────────[/dim]")
+            # ── STEP 1: Domain Sanity + Leakage + Imputation (parallel trio) ──
+            await self.log("[dim]─── Sanity · Imputation · Leakage (parallel) ─────[/dim]")
             await self.tree("Domain Sanity (Parallel)", "running")
-
-            from beyondml.agents.sanity_agent import SanityAgent
-            from beyondml.agents.drift_agent import DriftAgent
-
-            col_stats = profile.get("numerical_summary", {})
-            sanity_agent = SanityAgent(llm)
-            sanity_result, _ = await asyncio.gather(
-                sanity_agent.run(df_summary, col_stats, self.log),
-                asyncio.sleep(0),
-            )
-            await self.tree("Domain Sanity (Parallel)", "done")
-
-            # ── STEP 2: Imputation ──
-            await self.log("[dim]─── Imputation ──────────────────────────────────[/dim]")
             await self.tree("Imputation", "running")
 
+            from beyondml.agents.sanity_agent import SanityAgent
             from beyondml.agents.imputation_agent import ImputationAgent
-            imp_agent = ImputationAgent(llm)
-            imp_result = await imp_agent.run(df, profile, self.log)
-            df = imp_result["df"]
+
+            col_stats = profile.get("numerical_summary", {})
+            missing_pct = profile.get("missing_analysis", {}).get("missing_percentage", {})
+            missing_report = {k: v for k, v in missing_pct.items() if v > 0}
+
+            # Leakage needs target — only fire if target candidate known
+            candidate_target = user_target or target_info.get("suggested_target")
+            leakage_coro = None
+            if candidate_target:
+                await self.tree("Data Drift Analysis", "running")
+                from beyondml.agents.leakage_agent import LeakageAgent
+                corrs: dict = {}
+                try:
+                    if candidate_target in df.columns:
+                        corrs = {
+                            col: float(df[col].corr(df[candidate_target]))
+                            for col in df.select_dtypes("number").columns
+                            if col != candidate_target
+                        }
+                except Exception:
+                    pass
+                col_descs = "\n".join(f"{c}: {df[c].dtype}" for c in df.columns)
+                leakage_coro = LeakageAgent(llm).run(
+                    target_column=candidate_target,
+                    column_descriptions=col_descs,
+                    correlations=corrs,
+                    log=self.log,
+                )
+
+            sanity_agent = SanityAgent(llm)
+            imp_agent    = ImputationAgent(llm)
+
+            if leakage_coro:
+                sanity_result, imp_result, _ = await asyncio.gather(
+                    sanity_agent.run(df_summary, col_stats, self.log),
+                    imp_agent.run(df_summary, missing_report, self.log),
+                    leakage_coro,
+                )
+                await self.tree("Data Drift Analysis", "done")
+            else:
+                sanity_result, imp_result = await asyncio.gather(
+                    sanity_agent.run(df_summary, col_stats, self.log),
+                    imp_agent.run(df_summary, missing_report, self.log),
+                )
+
+            await self.tree("Domain Sanity (Parallel)", "done")
+
+            # Apply imputation strategies
+            for s in imp_result.get("strategies", []):
+                col      = s.get("column")
+                strategy = s.get("strategy")
+                if not col or col not in df.columns:
+                    continue
+                if strategy == "median":
+                    df[col] = df[col].fillna(df[col].median())
+                elif strategy == "mean":
+                    df[col] = df[col].fillna(df[col].mean())
+                elif strategy == "mode" and not df[col].mode().empty:
+                    df[col] = df[col].fillna(df[col].mode()[0])
+                elif strategy == "drop":
+                    df = df.drop(columns=[col])
+
             await self.tree("Imputation", "done")
 
-            # ── STEP 3: Orchestrator ──
+            # ── STEP 2: Orchestrator ──
             await self.log("[dim]─── Orchestrator ────────────────────────────────[/dim]")
             await self.tree("Orchestrator", "running")
 
@@ -206,15 +252,16 @@ class PipelineRunner:
             decision = await orch.run(
                 df_summary=df_summary,
                 description=description,
-                target_info=target_info,
-                user_path_choice=path_choice,
+                user_target=user_target or None,
+                user_path_choice=path_choice if path_choice != "autonomous" else "auto",
                 log=self.log,
             )
+
             # Prefer explicit user_target, then LLM suggestion, then auto-identified
             target = (
                 user_target
                 or decision.get("suggested_target")
-                or (target_info.get("candidates", [None])[0] if target_info else None)
+                or target_info.get("suggested_target")
             )
             path         = decision.get("path", "supervised")
             model_recs   = decision.get("model_recommendations", ["RandomForest"])
@@ -224,33 +271,7 @@ class PipelineRunner:
             await self.stat("task", task_type)
             await self.tree("Orchestrator", "done")
 
-            # ── STEP 3.5: Leakage check (only if supervised target known) ──
-            if target and path in ("supervised", "deep_learning"):
-                await self.tree("Data Drift Analysis", "running")
-                from beyondml.agents.leakage_agent import LeakageAgent
-                num_cols = profile.get("numerical_summary", {})
-                corrs: dict = {}
-                try:
-                    if target in df.columns:
-                        corrs = {
-                            col: float(df[col].corr(df[target]))
-                            for col in df.select_dtypes("number").columns
-                            if col != target
-                        }
-                except Exception:
-                    pass
-
-                col_descs = "\n".join(f"{c}: {df[c].dtype}" for c in df.columns)
-                leakage_agent = LeakageAgent(llm)
-                leakage_result = await leakage_agent.run(
-                    target_column=target,
-                    column_descriptions=col_descs,
-                    correlations=corrs,
-                    log=self.log,
-                )
-                await self.tree("Data Drift Analysis", "done")
-
-            # ── STEP 4: EDA + Outlier (parallel) ──
+            # ── STEP 3: EDA + Outlier (parallel) ──
             await self.log("[dim]─── EDA Agent ───────────────────────────────────[/dim]")
             await self.tree("EDA Agent (Parallel)", "running")
             await self.tree("Outlier Handler (Parallel)", "running")
@@ -261,16 +282,14 @@ class PipelineRunner:
 
             profiler = DatasetProfiler(df, target_column=target)
             profile  = profiler.run()
+            outlier_summary = profile.get("outlier_summary", {})
 
-            eda_agent = EDAAgent(llm)
+            eda_agent     = EDAAgent(llm)
             outlier_agent = OutlierAgent(llm)
 
-            outlier_summary = profile.get("outlier_summary", {})
             eda_result, outlier_result = await asyncio.gather(
-                eda_agent.run(df, profile=profile, target_info=target_info,
-                              description=description, log=self.log),
-                outlier_agent.run(df, outlier_summary, profile, self.log,
-                                  self.get_user_input),
+                eda_agent.run(df, profile, target_info, description, self.log),
+                outlier_agent.run(df, outlier_summary, profile, self.log, self.get_user_input),
             )
             df = outlier_result["df"]
             df = df.replace([np.inf, -np.inf], np.nan)
@@ -279,8 +298,7 @@ class PipelineRunner:
             eda_charts = eda_result.get("charts", [])
             for chart_entry in eda_charts:
                 if isinstance(chart_entry, dict) and "fig" in chart_entry:
-                    await self.chart(chart_entry.get("title", "EDA Chart"),
-                                     chart_entry["fig"])
+                    await self.chart(chart_entry.get("title", "EDA Chart"), chart_entry["fig"])
 
             confirmed_target = eda_result.get("suggested_target") or target
             task_type        = eda_result.get("task_type", task_type)
@@ -292,8 +310,7 @@ class PipelineRunner:
             await self.stat("split", f"{1-test_size:.0%} / {test_size:.0%}")
 
             await self.tree("EDA Agent (Parallel)", "done")
-            await self.tree("Outlier Handler (Parallel)",
-                            "done")
+            await self.tree("Outlier Handler (Parallel)", "done")
 
             if path in ("explore", "dimensionality_reduction"):
                 await self.log("[bold green]Exploration complete.[/bold green]")
@@ -347,7 +364,7 @@ class PipelineRunner:
                     return
 
                 prebuilt_model = None
-                if path == "supervised":
+                if path in ("supervised", "autonomous", "auto"):
                     # ── GA Trainer ──
                     await self.log("[dim]─── GA Trainer ───────────────────────────────[/dim]")
                     await self.tree("GA Trainer (Supervised)", "running")
@@ -371,8 +388,7 @@ class PipelineRunner:
 
                     async def on_ga_progress(gen_summary):
                         fitness_data.append(gen_summary["best_fitness"] * 100)
-                        await self.stat("fitness_latest",
-                                        f"{gen_summary['best_fitness']:.4f}")
+                        await self.stat("fitness_latest", f"{gen_summary['best_fitness']:.4f}")
                         await self._send({
                             "type": "ga_progress",
                             "payload": {"fitness": fitness_data.copy()},
@@ -425,10 +441,11 @@ class PipelineRunner:
                     await self.tree("DL Trainer (Neural Net)", "running")
                     from beyondml.agents.dl_agent import DeepLearningAgent
                     dl_agent  = DeepLearningAgent(llm)
+                    problem_t = profile.get("target_analysis", {}).get("target_type", "classification") if profile.get("target_analysis") else "classification"
                     dl_result = await dl_agent.run(
                         df=df,
                         target_column=confirmed_target,
-                        problem_type=profile["target_analysis"]["target_type"],
+                        problem_type=problem_t,
                         log=self.log,
                         epochs=10,
                     )
@@ -442,16 +459,17 @@ class PipelineRunner:
 
                 from beyondml.agents.evaluator_agent import EvaluatorAgent
                 eval_agent  = EvaluatorAgent(llm)
+                prob_type = profile.get("target_analysis", {}).get("target_type", "classification") if profile.get("target_analysis") else "classification"
                 eval_result = await eval_agent.run(
                     df=df,
                     target_column=confirmed_target,
                     profile=profile,
                     best_params=best_params,
                     model_type=model_type,
-                    problem_type=profile["target_analysis"]["target_type"],
+                    problem_type=prob_type,
                     log=self.log,
-                    prebuilt_model=prebuilt_model,
                     test_size=test_size,
+                    prebuilt_model=prebuilt_model,
                 )
 
                 test_score  = eval_result.get("test_score", 0)
@@ -464,12 +482,9 @@ class PipelineRunner:
                 eval_charts = eval_result.get("charts", [])
                 for chart_entry in eval_charts:
                     if isinstance(chart_entry, dict) and "fig" in chart_entry:
-                        await self.chart(chart_entry.get("title", "Eval Chart"),
-                                         chart_entry["fig"])
+                        await self.chart(chart_entry.get("title", "Eval Chart"), chart_entry["fig"])
 
-                if eval_result.get("test_score", 0) > (
-                    best_eval_result or {}
-                ).get("test_score", -1):
+                if eval_result.get("test_score", 0) > (best_eval_result or {}).get("test_score", -1):
                     best_eval_result = eval_result
 
                 # ── Explainability ──
@@ -477,7 +492,14 @@ class PipelineRunner:
                 from beyondml.agents.explainability_agent import ExplainabilityAgent
                 explain_agent = ExplainabilityAgent(llm)
                 try:
-                    await explain_agent.run(eval_result, self.log)
+                    X_eval = df.drop(columns=[confirmed_target], errors="ignore")
+                    await explain_agent.run(
+                        model_pipeline=prebuilt_model,
+                        X_eval=X_eval,
+                        target_column=confirmed_target,
+                        problem_type=prob_type,
+                        log=self.log,
+                    )
                 except Exception:
                     pass
                 await self.tree("Explainability", "done")

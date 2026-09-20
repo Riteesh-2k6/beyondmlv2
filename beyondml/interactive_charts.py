@@ -113,13 +113,7 @@ def generate_pca(df: pd.DataFrame, target_col: str = None) -> str:
             # Actually plot spheres with lighting 
             # (Note in plotly scatter_3d they are spheres when marker.symbol isn't changed, but we can improve lighting)
             for trace in fig.data:
-                trace.marker.coloraxis = None # Sometimes needed for custom lighting config
-                
-            fig.update_traces(
-                # Use a somewhat glossy surface lighting
-                lighting=dict(ambient=0.4, diffuse=0.8, fresnel=0.2, roughness=0.5, specular=1.5),
-                lightposition=dict(x=100, y=100, z=0)
-            )
+                trace.marker.coloraxis = None
 
         else:
             fig = px.scatter(
