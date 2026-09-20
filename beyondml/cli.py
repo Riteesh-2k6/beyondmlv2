@@ -52,5 +52,30 @@ def benchmark(datasets):
     asyncio.run(runner.run_benchmark())
 
 
+@main.command()
+@click.option("--port", default=7777, show_default=True, help="Port for the web server.")
+@click.option("--no-browser", is_flag=True, default=False, help="Don't open browser automatically.")
+def web(port, no_browser):
+    """Launch the BeyondML Web UI (FastAPI + React)."""
+    import threading
+    import time
+    import webbrowser
+    import uvicorn
+
+    def _open():
+        time.sleep(1.5)
+        if not no_browser:
+            webbrowser.open(f"http://localhost:{port}")
+
+    threading.Thread(target=_open, daemon=True).start()
+    uvicorn.run(
+        "beyondml.web.server:app",
+        host="0.0.0.0",
+        port=port,
+        reload=False,
+        log_level="info",
+    )
+
+
 if __name__ == "__main__":
     main()

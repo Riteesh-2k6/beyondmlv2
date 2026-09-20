@@ -1,0 +1,62 @@
+@import '@fontsource/geist/index.css';
+@import '@fontsource/geist-mono/index.css';
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ── Root ─────────────────────────────────────────── */
+:root {
+  color-scheme: dark;
+  background-color: #09090B;
+  color: #E4E4E7;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  font-family: 'Geist', ui-sans-serif, system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ── Browser surfaces ─────────────────────────────── */
+::selection {
+  background: #F97316;
+  color: #09090B;
+}
+
+::-webkit-scrollbar       { width: 5px; height: 5px; }
+::-webkit-scrollbar-track { background: #09090B; }
+::-webkit-scrollbar-thumb { background: #27272A; border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: #3F3F46; }
+
+input, textarea   { caret-color: #F97316; }
+
+*:focus-visible {
+  outline: 1.5px solid #F97316;
+  outline-offset: 2px;
+  border-radius: 2px;
+}
+
+/* ── Rich markup log line classes ─────────────────── */
+.log-agent-header { color: #D946EF; font-weight: 700; }
+.log-success      { color: #22C55E; font-weight: 700; }
+.log-info         { color: #22D3EE; font-weight: 700; }
+.log-warn         { color: #EAB308; font-weight: 700; }
+.log-error-text   { color: #EF4444; }
+.log-accent       { color: #F97316; font-weight: 700; }
+.log-muted        { color: #71717A; }
+.log-bold         { font-weight: 700; }
+.log-italic       { font-style: italic; }
+
+/* ── Plotly chart container dark override ─────────── */
+.plotly-chart-wrap .js-plotly-plot { background: transparent !important; }
+
+/* ── Panel borders  ───────────────────────────────── */
+.panel-center { border: 1px solid #F97316; }
+.panel-side   { border: 1px solid #27272A; }
+
+/* ── Utility: hide scrollbar but keep scrollable ──── */
+.no-scrollbar::-webkit-scrollbar { display: none; }
+.no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
