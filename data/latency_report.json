@@ -1,0 +1,74 @@
+{
+  "provider": "groq",
+  "dataset_shape": [
+    300,
+    6
+  ],
+  "total_seconds": 7.787,
+  "stages": [
+    {
+      "stage": "profiler",
+      "seconds": 0.019
+    },
+    {
+      "stage": "orchestrator",
+      "seconds": 0.46
+    },
+    {
+      "stage": "sanity_agent",
+      "seconds": 0.069
+    },
+    {
+      "stage": "imputation_agent",
+      "seconds": 0.068
+    },
+    {
+      "stage": "leakage_agent",
+      "seconds": 0.079
+    },
+    {
+      "stage": "eda_agent",
+      "seconds": 0.665
+    },
+    {
+      "stage": "outlier_agent",
+      "seconds": 0.084
+    },
+    {
+      "stage": "feature_agent",
+      "seconds": 0.094
+    },
+    {
+      "stage": "ga_trainer",
+      "seconds": 5.544
+    },
+    {
+      "stage": "evaluator_agent",
+      "seconds": 0.284
+    },
+    {
+      "stage": "reflection_agent",
+      "seconds": 0.06
+    }
+  ],
+  "serial_bottlenecks": [
+    {
+      "stage": "ga_trainer",
+      "seconds": 5.544
+    }
+  ],
+  "parallelisable_pairs": [
+    [
+      "sanity_agent",
+      "imputation_agent"
+    ],
+    [
+      "eda_agent",
+      "outlier_agent"
+    ],
+    [
+      "leakage_agent",
+      "sanity_agent"
+    ]
+  ]
+}
