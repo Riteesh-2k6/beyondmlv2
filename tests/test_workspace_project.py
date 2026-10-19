@@ -6,6 +6,11 @@ import pytest
 from beyondml.workspace.project import PathError, Project, ProjectError
 
 
+@pytest.fixture(autouse=True)
+def _home(tmp_path_factory, monkeypatch):
+    monkeypatch.setenv("BEYONDML_HOME", str(tmp_path_factory.mktemp("bhome")))
+
+
 def git(root, *args):
     return subprocess.run(["git", *args], cwd=root, check=True, capture_output=True, text=True).stdout
 
@@ -42,6 +47,8 @@ def test_path_guard(tmp_path):
         p.path(str(tmp_path.anchor) + "Windows")
     with pytest.raises(PathError):
         p.path("data/raw/a.csv", write=True)
+    with pytest.raises(PathError):
+        p.path(".git/hooks/pre-commit", write=True)
     p.path("data/raw/a.csv")
     outside = tmp_path / "outside"
     outside.mkdir()
@@ -110,3 +117,30 @@ def test_ledger_roundtrip(tmp_path):
     p.ledger_append({"a": 1})
     rec = p.ledger()[0]
     assert rec["a"] == 1 and "ts" in rec
+
+
+def test_restore_bad_sha_raises(tmp_path):
+    p = Project.init(tmp_path)
+    p.write("a.txt", "x")
+    with pytest.raises(ProjectError):
+        p.restore("garbage", ["a.txt"])
+    assert p.read("a.txt") == "x"
+
+
+def test_restore_refuses_root_and_git(tmp_path):
+    p = Project.init(tmp_path)
+    sha = p.checkpoint("c")
+    for bad in [".", ".git", ".beyondml/settings.toml"]:
+        with pytest.raises(PathError):
+            p.restore(sha, [bad])
+
+
+def test_settings_not_aliased(tmp_path):
+    p = Project.init(tmp_path)
+    p.settings()["run"]["mode"] = "mutated"
+    assert p.settings()["run"]["mode"] == "auto"
+
+
+def test_lock_shared_across_instances(tmp_path):
+    p = Project.init(tmp_path)
+    assert Project.open(tmp_path)._lock is Project.open(tmp_path)._lock is p._lock

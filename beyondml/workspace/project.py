@@ -1,6 +1,7 @@
 """A BeyondML project folder: files, path guard, ledger, git checkpoints, settings."""
 from __future__ import annotations
 
+import copy
 import json
 import os
 import shutil
@@ -34,16 +35,25 @@ def beyondml_home() -> Path:
 
 
 def _merge(base: dict, over: dict) -> dict:
-    out = dict(base)
+    out = copy.deepcopy(base)
     for k, v in over.items():
-        out[k] = _merge(out[k], v) if isinstance(v, dict) and isinstance(out.get(k), dict) else v
+        out[k] = _merge(out[k], v) if isinstance(v, dict) and isinstance(out.get(k), dict) else copy.deepcopy(v)
     return out
+
+
+_LOCKS: dict[Path, threading.Lock] = {}
+_LOCKS_GUARD = threading.Lock()
+
+
+def _lock_for(root: Path) -> threading.Lock:
+    with _LOCKS_GUARD:
+        return _LOCKS.setdefault(root.resolve(), threading.Lock())
 
 
 class Project:
     def __init__(self, root: Path):
         self.root = Path(root)
-        self._lock = threading.Lock()
+        self._lock = _lock_for(self.root)
 
     def _git(self, *args: str, check: bool = True) -> str:
         r = subprocess.run(["git", *args], cwd=self.root, check=check, capture_output=True, text=True)
@@ -87,6 +97,8 @@ class Project:
             raise PathError(f"path escapes the project: {rel}")
         if write and p.is_relative_to(root / "data" / "raw"):
             raise PathError(f"data/raw is read-only: {rel}")
+        if write and p.is_relative_to(root / ".git"):
+            raise PathError(f"writing under .git is not allowed: {rel}")
         return p
 
     def read(self, rel: str) -> str:
@@ -118,12 +130,26 @@ class Project:
             return self._git("rev-parse", "HEAD")
 
     def restore(self, sha: str, paths: Iterable[str]) -> None:
+        root = self.root.resolve()
+        targets = []
+        for rel in paths:
+            p = self.path(rel, write=True)
+            if p == root or p.is_relative_to(root / ".git") or p.is_relative_to(root / ".beyondml"):
+                raise PathError(f"cannot restore {rel}")
+            targets.append(p)
         with self._lock:
-            for rel in paths:
-                p = self.path(rel, write=True)
-                git_rel = p.relative_to(self.root.resolve()).as_posix()
-                r = subprocess.run(["git", "cat-file", "-e", f"{sha}:{git_rel}"], cwd=self.root, capture_output=True)
-                if r.returncode == 0:
+            if subprocess.run(["git", "rev-parse", "--verify", "--quiet", f"{sha}^{{commit}}"],
+                              cwd=self.root, capture_output=True).returncode != 0:
+                raise ProjectError(f"unknown commit: {sha}")
+            for p in targets:
+                git_rel = p.relative_to(root).as_posix()
+                # cat-file -e exits 128 for a missing path (same as real errors), so use ls-tree:
+                # exit 0 with empty output = absent at sha, non-zero = real failure.
+                r = subprocess.run(["git", "ls-tree", "--name-only", sha, "--", git_rel],
+                                   cwd=self.root, capture_output=True, text=True)
+                if r.returncode != 0:
+                    raise ProjectError(f"git ls-tree failed (exit {r.returncode}) for {git_rel}")
+                if r.stdout.strip():
                     self._git("checkout", sha, "--", git_rel)
                 elif p.is_dir():
                     shutil.rmtree(p)
@@ -131,7 +157,7 @@ class Project:
                     p.unlink(missing_ok=True)
 
     def settings(self) -> dict:
-        out = DEFAULT_SETTINGS
+        out = copy.deepcopy(DEFAULT_SETTINGS)
         for f in (beyondml_home() / "settings.toml", self.root / ".beyondml" / "settings.toml"):
             if f.is_file():
                 out = _merge(out, tomllib.loads(f.read_text(encoding="utf-8")))
