@@ -29,3 +29,7 @@ The `self.log` function is already safe (appends to a queue); `get_user_input` i
 already serialized via an asyncio.Queue in PipelineRunner.
 
 Expected speedup: 2× on EDA+Outlier block (on Ollama: saves 3-18s).
+
+## Verified 2026-10-19
+- asyncio.gather of eda_agent and outlier_agent exists in beyondml/web/runner.py, but both call blocking self.llm.chat so they still run serially; needs achat (L05).
+- outlier_agent get_user_input concurrent with EDA not addressed.

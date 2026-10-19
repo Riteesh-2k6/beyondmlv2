@@ -21,3 +21,9 @@ Web mapping:
 7. ASCII banner: BEYOND ML banner rendered as a `<pre>` element in Geist Mono with orange text gradient — matches the TUI BANNER string character-for-character.
 
 Visual: full-width single-column form, max-width 680px centered, bg `#09090B`, orange accent on focus/selected. No card grid scaffolding (craft-floor ban).
+
+## Verified 2026-10-19
+- No server-side path field for power users in pages/SetupPage.tsx.
+- File selection shows filename only; no preview row count.
+- Banner (components/Banner.tsx) is solid orange, no orange text gradient; not verified character-for-character against TUI BANNER (no BANNER constant found in beyondml/*.py).
+- Start button spinner not verified/unclear beyond disabled={!form.file || loading}.

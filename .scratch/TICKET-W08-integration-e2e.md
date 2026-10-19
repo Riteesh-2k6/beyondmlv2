@@ -17,3 +17,8 @@ Deliverables:
 5. `PYTHONPATH=. pytest tests/test_web_server.py -v` passes: covers upload endpoint, WS message schema, input_request/response round-trip, markup parser.
 
 Also: confirm existing TUI (`beyondml run`) still works — `beyondml/cli.py` change must not break the `run` subcommand.
+
+## Verified 2026-10-19
+- No smoke test (item 4): nothing uploads the CSV fixture, runs autonomous path and asserts all WS event types and an inline chart.
+- TUI 'beyondml run' still working not verified by any test.
+- Done: 'beyondml web' in cli.py, dist/ build present, StaticFiles mount, vite proxy, tests/test_web_server.py (78 pass). cli binds 0.0.0.0, not localhost only.

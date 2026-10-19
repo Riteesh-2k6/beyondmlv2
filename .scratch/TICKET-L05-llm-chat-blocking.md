@@ -28,3 +28,7 @@ mechanical find-replace in each agent. The existing `chat()` stays for backward
 compatibility (TUI and tests still call it synchronously).
 
 Expected impact: unlocks ALL gather()-based parallelism in L03 and L04.
+
+## Verified 2026-10-19
+- No async def achat in LLMProvider base or providers under beyondml/llm/ (grep 'achat' finds nothing in beyondml/ or tests/).
+- All agents still call self.llm.chat (drift, eda, evaluator, explainability, feature, imputation, leakage, orchestrator, outlier, reflection, sanity).

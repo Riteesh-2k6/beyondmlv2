@@ -26,3 +26,8 @@ Test cases:
 - `parse_rich_markup("[bold magenta]● Orch[/bold magenta]  msg")` → `[{text:"● Orch", cls:"agent-header"}, {text:"  msg", cls:""}]`
 - Nested tags: `[bold][red]text[/red][/bold]` → combined class
 - Unknown tag: pass through as plain text, no crash
+
+## Verified 2026-10-19
+- Nested tags do not yield a combined class: beyondml/web/markup.py parse_rich_markup keeps only the innermost class (style_stack[-1]), so [bold][red]x[/red][/bold] -> 'error-text' only.
+- Ticket's class map includes 'cyan' and 'code' classes; markup.py/LogLine.tsx have no 'code' class and map 'cyan' to 'info'.
+- Test for nested tags is absent from tests/test_web_server.py.

@@ -22,3 +22,8 @@ Test cases:
 - `test_stat_event`: stat update → `{type:"stat", payload:{key:"shape", value:"200×6"}}`
 - `test_input_request_roundtrip`: backend sends `input_request`, client sends `user_response` → `get_user_input()` resolves
 - `test_chart_event`: Plotly JSON delivered as `{type:"chart", payload:{plotly_json:{...}}}`
+
+## Verified 2026-10-19
+- No test_chart_event: PipelineRunner.chart() in beyondml/web/runner.py is not covered in tests/test_web_server.py.
+- test_input_request_roundtrip covers only get_user_input at runner level; no WebSocket-level input_request -> user_response test.
+- Log payload is {spans, timestamp}, not {level, content} as in the ticket's test_ws_log_event (superseded by W06, but ticket text not reconciled).

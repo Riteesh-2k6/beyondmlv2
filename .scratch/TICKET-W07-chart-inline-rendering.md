@@ -22,3 +22,8 @@ Test cases:
 - `fig_to_json(go.Figure())` → valid dict with `data` and `layout` keys
 - Frontend: PlotlyChart renders without crashing on a minimal `{data:[], layout:{}}` JSON
 - Dark theme is applied: bg colors match obsidian tokens
+
+## Verified 2026-10-19
+- No fig_to_json(fig) -> dict in beyondml/interactive_charts.py (conversion is inline in PipelineRunner.chart in beyondml/web/runner.py).
+- No test for fig_to_json, no backend test of chart event, no frontend PlotlyChart test (component is inline ChartEntry in components/LogPane.tsx, no standalone PlotlyChart).
+- Existing agents still write HTML via interactive_charts; no hook intercepts action_view_charts.

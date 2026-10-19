@@ -29,3 +29,10 @@ joblib spawns processes on Windows which adds ~1-2s fork overhead per generation
    to increase it. Cap at 150 for automated runs.
 
 Expected speedup: 3-4× on the GA stage (36s → ~9-12s) for default params.
+
+## Verified 2026-10-19
+- beyondml/engine/genetic.py _evaluate_genome_worker still uses cv=5 always (no 3-fold for pop<20).
+- Parallel(n_jobs=-1) has no prefer='threads'.
+- Elite fitness cache: evaluation condition 'genome.fitness == 0 or gen == 0' unchanged.
+- n_estimators defaults/choices still 100 and up to 300; no 50 warm-start / 150 cap.
+- Commit 8d7be8a contains only .scratch tickets, latency_profile.py and pycache, no engine changes.

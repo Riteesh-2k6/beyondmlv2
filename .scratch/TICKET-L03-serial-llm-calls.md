@@ -33,3 +33,6 @@ inside an event loop — wrapping with `asyncio.to_thread` needed for the LLM ca
 within each agent to truly parallelize.
 
 Expected speedup: 3× reduction on these 3 agents (on Ollama: saves ~20-30s).
+
+## Verified 2026-10-19
+- asyncio.gather exists in beyondml/web/runner.py (sanity, imputation, leakage), but agents call synchronous self.llm.chat inside async run, so calls are not actually concurrent; no asyncio.to_thread/achat (depends on L05).

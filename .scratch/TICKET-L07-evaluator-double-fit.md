@@ -19,3 +19,7 @@ the same data. This is a redundant full fit + train/test split evaluation.
    fit is skipped.
 
 Expected speedup: saves ~1.2s (the model build + fit portion of the 1.643s).
+
+## Verified 2026-10-19
+- GATrainerAgent.run() in beyondml/agents/ga_trainer.py returns best_params but no best_fitted_pipeline.
+- Runner never passes a GA-fitted model to EvaluatorAgent as prebuilt_model (only the ensemble path sets it); the prebuilt_model parameter itself exists in evaluator_agent.py.

@@ -37,3 +37,9 @@ results = Parallel(n_jobs=-1, prefer="threads")(
     if id(genome) in new_genomes or gen == 0
 )
 ```
+
+## Verified 2026-10-19
+- Adaptive cv_folds (3 if <500 rows else 5) missing in beyondml/engine/genetic.py _evaluate_genome_worker (cv=5 hardcoded).
+- n_estimators init cap of 75 / choice([10,25,50]) missing (current choices 50..300).
+- Parallel(prefer='threads') missing.
+- Fitness cache for elites (evaluate only new genomes) missing.

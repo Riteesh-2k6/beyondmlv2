@@ -16,3 +16,9 @@ Decisions:
 4. Global CSS: custom scrollbar styling (thin, `#27272A`), text selection (`#F97316`/white), caret color, focus-ring override. These are the craft-floor browser-surface details.
 5. shadcn/ui installed for: `Button`, `Input`, `Dialog`, `RadioGroup`, `Progress`. All components re-skinned to obsidian tokens — no default slate/gray.
 6. `useWebSocket` custom hook (wraps native WebSocket, auto-reconnect, message queue).
+
+## Verified 2026-10-19
+- shadcn/ui not installed: no Button/Input/Dialog/RadioGroup/Progress components (no components/ui, no components.json); modals and inputs are hand-rolled.
+- src/lib/ directory missing.
+- No useWebSocket hook; hooks/usePipelineWS.ts has no auto-reconnect (onclose only dispatches DISCONNECTED) and no message queue.
+- React Router is v7 (react-router-dom ^7), ticket says v6.

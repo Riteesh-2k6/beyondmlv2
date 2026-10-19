@@ -16,3 +16,6 @@ The TUI uses Textual's built-in theming: `$accent` (orange3), `$warning` (amber)
 4. Agent log markup: TUI uses Rich markup `[bold magenta]`, `[bold green]`, `[dim]` etc. How are these rendered in the browser (CSS classes? inline spans?)?
 5. Chart panel: TUI has charts as ANSI art + separate browser tabs. Web has inline Plotly. What is the panel split — does the chart area sit below the log in the center panel, or side-by-side?
 6. GA fitness sparkline: TUI uses Textual's Sparkline widget. Web replacement: Recharts / Chart.js inline sparkline.
+
+## Verified 2026-10-19
+- No DESIGN.md exists in the repo; the decisions (typography, token map, borders, markup class map, chart panel split, sparkline) are not recorded anywhere. Tokens only live in beyondml/web/ui/tailwind.config.js and src/index.css.

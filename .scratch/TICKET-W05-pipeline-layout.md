@@ -26,3 +26,10 @@ Right panel — Stats + Data preview:
 Bottom bar — Input:
 - Persists across the pipeline. When backend sends `input_request`, the input field becomes active and shows the prompt. Otherwise it shows dim keybind hints.
 - Keybinds: s=save, e=export, c=view all charts (opens chart gallery modal).
+
+## Verified 2026-10-19
+- Pipeline tree nodes (components/PipelineTree.tsx) are not clickable/collapsible; no scroll-to-reasoning.
+- No Agent Reasoning section below the tree.
+- GA fitness sparkline is in StatsPanel (right), not in center panel below the log; no mini sparkline distinction.
+- Keybinds s=save and e=export missing (PipelinePage.tsx handles only c and Escape); InputBar shows only a 'c charts' hint.
+- No frontend tests; frontend build output exists but layout is unverified at runtime.

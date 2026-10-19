@@ -38,7 +38,7 @@ async def test_full_supervised_pipeline_integration(classification_df, mock_llm)
     decision = await orchestrator.run(
         df_summary=df_summary,
         description="A synthetic classification dataset.",
-        target_info=target_info,
+        user_target=None,
         user_path_choice="auto",
         log=mock_log
     )
@@ -137,7 +137,7 @@ async def test_deep_learning_pipeline_integration(classification_df, mock_llm):
     decision = await orchestrator.run(
         df_summary="Rows: 200, Cols: 6",
         description="Deep learning test.",
-        target_info=target_info,
+        user_target=None,
         user_path_choice="auto",
         log=mock_log
     )

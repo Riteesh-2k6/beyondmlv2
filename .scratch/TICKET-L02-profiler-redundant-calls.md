@@ -24,3 +24,8 @@ and `_correlation_summary` — doubling the work on each call.
 3. In `_calculate_ori`: avoid re-calling `_target_analysis()` and `_outlier_summary()` if they've already been computed in `run()` — accept them as arguments instead.
 
 Expected speedup: eliminates ~0.2s on small datasets; 1-3s on wide datasets (50+ cols).
+
+## Verified 2026-10-19
+- No ProfileCache in beyondml/web/runner.py; DatasetProfiler is re-instantiated and run() each time.
+- No partial re-profile.
+- beyondml/engine/profiler.py _calculate_ori still calls _target_analysis() and _outlier_summary() itself instead of taking them as arguments.
