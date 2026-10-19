@@ -59,3 +59,22 @@ async def test_confirmation_callable_matches_adk(tmp_path):
 
     t = build_tools(env, [run_python])[0]
     assert await t.check_require_confirmation({"script": "s.py"}, None) is True
+
+
+async def test_outcome_none_not_counted(tmp_path):
+    env = mk(tmp_path)
+    env.outcome = None
+    write = build_tools(env, file_tools(env), {"write_file"})[0].func
+    for _ in range(3):
+        assert write("../x", "1")["ok"] is False
+
+
+async def test_autonomous_tools_have_no_confirmation(tmp_path):
+    def run_python(script: str) -> dict:
+        """Run a script."""
+        return {"ok": True}
+
+    for mode, expected in (("autonomous", False), ("ask", True)):
+        env = mk(tmp_path / mode, mode)
+        t = build_tools(env, [run_python])[0]
+        assert await t.check_require_confirmation({"script": "s.py"}, None) is expected

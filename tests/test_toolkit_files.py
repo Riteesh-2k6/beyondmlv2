@@ -104,3 +104,21 @@ async def test_update_plan_keeps_done(tmp_path):
     up(plan([step("a", status="done")]))
     assert up(plan([step("a")]))["ok"]
     assert load_plan(env.project).step("a").status == "done"
+
+
+async def test_list_files_refuses_escape(tmp_path):
+    env = mk(tmp_path)
+    (tmp_path / "secret.txt").write_text("s", encoding="utf-8")
+    lf = tools(file_tools(env))["list_files"]
+    for pat in ("../*", "**/../../*"):
+        r = lf(".", pat)
+        assert "../secret.txt" not in r.get("files", []) and r["ok"] is False
+    assert "secret.txt" not in lf(".", "*")["files"]
+
+
+async def test_write_file_normalises_path(tmp_path):
+    touched = []
+    env = mk(tmp_path, touched=touched)
+    r = tools(file_tools(env))["write_file"]("./src//a.py", "x")
+    ev = [json.loads(x) for x in env.project.path("agents/s1/events.jsonl").read_text(encoding="utf-8").splitlines()]
+    assert r["path"] == touched[0] == ev[-1]["data"]["path"] == "src/a.py"
