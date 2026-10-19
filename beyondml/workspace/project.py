@@ -116,7 +116,7 @@ class Project:
         self.write("MEMORY.md", "\n".join(lines) + "\n")
 
     def ledger_append(self, record: dict) -> None:
-        with open(self.path(LEDGER, write=True), "a", encoding="utf-8") as f:
+        with self._lock, open(self.path(LEDGER, write=True), "a", encoding="utf-8") as f:
             f.write(json.dumps({**record, "ts": time.time()}) + "\n")
 
     def ledger(self) -> list[dict]:
