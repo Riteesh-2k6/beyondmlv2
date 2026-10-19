@@ -1,0 +1,22 @@
+{
+  "engine": "v1",
+  "cpu_count": 16,
+  "speed": {
+    "cold_s": 15.639,
+    "warm_s": 9.443
+  },
+  "quality": {
+    "seeds": [
+      0,
+      1,
+      2
+    ],
+    "mu_cv": [
+      0.916667,
+      0.94,
+      0.916667
+    ],
+    "mean_mu_cv": 0.924445
+  },
+  "adult": null
+}

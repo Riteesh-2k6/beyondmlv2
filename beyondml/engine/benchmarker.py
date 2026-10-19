@@ -19,6 +19,37 @@ from beyondml.agents.orchestrator import OrchestratorAgent
 from beyondml.agents.ga_trainer import GATrainerAgent
 from beyondml.llm import get_llm_provider
 
+def latency_frame() -> pd.DataFrame:
+    """Synthetic 300-row frame used by the GA speed benchmark.
+
+    Exact copy of make_df(300) in data/latency_profile.py (seed 42, 20 NaNs in income).
+    """
+    n = 300
+    rng = np.random.RandomState(42)
+    df = pd.DataFrame({
+        "age":      rng.randint(18, 70, n),
+        "income":   rng.normal(50_000, 15_000, n).round(2),
+        "score":    rng.uniform(0, 100, n).round(2),
+        "category": rng.choice(["A", "B", "C"], n),
+        "flag":     rng.choice([0, 1], n),
+        "target":   rng.choice([0, 1], n),
+    })
+    df.loc[rng.choice(n, 20, replace=False), "income"] = np.nan
+    return df
+
+
+def quality_frame() -> pd.DataFrame:
+    """Learnable 300-row frame (6 features, 4 informative) used by the GA quality benchmark."""
+    from sklearn.datasets import make_classification
+
+    X, y = make_classification(
+        n_samples=300, n_features=6, n_informative=4, n_redundant=0, random_state=0
+    )
+    df = pd.DataFrame(X, columns=[f"f{i}" for i in range(6)])
+    df["target"] = y
+    return df
+
+
 class PMLBRunner:
     """Benchmark runner for BeyondML using PMLB datasets."""
 
