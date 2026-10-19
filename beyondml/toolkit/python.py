@@ -9,6 +9,7 @@ import re
 import signal
 import subprocess
 import sys
+import threading
 import time
 import uuid
 from pathlib import Path
@@ -19,7 +20,8 @@ from beyondml.workspace.events import EventBus
 from beyondml.workspace.project import PathError, Project
 
 SECRET = re.compile(r"KEY|TOKEN|SECRET|PASSWORD", re.I)
-_NAME = re.compile(r"^[A-Za-z0-9_.\[\],<>=!~-]+$")
+_NAME = re.compile(r"[A-Za-z0-9_.\[\],<>=!~-]+")
+_INSTALL_LOCK = threading.Lock()
 _SKIP_TOP = {".git", ".beyondml", "agents"}
 TAIL = 200
 _WIN = sys.platform == "win32"
@@ -71,6 +73,31 @@ def _fail(error: str) -> dict:
     return {"ok": False, "error": error}
 
 
+def _spawn(argv: list[str], cwd: Path, env: dict, timeout: int) -> tuple[int | None, bool, bytes, bytes, float]:
+    """Run argv; on timeout kill the whole tree and wait at most 5 s more. Always returns."""
+    kw = ({"creationflags": subprocess.CREATE_NEW_PROCESS_GROUP} if _WIN else {"start_new_session": True})
+    t0 = time.time()
+    proc = subprocess.Popen(argv, cwd=cwd, env=env, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE,
+                            stderr=subprocess.PIPE, **kw)
+    timed_out = False
+    try:
+        out, err = proc.communicate(timeout=timeout)
+    except subprocess.TimeoutExpired as e:
+        timed_out = True
+        out, err = e.stdout or b"", e.stderr or b""
+        _kill_tree(proc)
+        try:
+            out, err = proc.communicate(timeout=5)
+        except subprocess.TimeoutExpired as e2:
+            out, err = e2.stdout or out, e2.stderr or err
+            for f in (proc.stdout, proc.stderr):
+                try:
+                    f.close()
+                except OSError:
+                    pass
+    return proc.returncode, timed_out, out, err, round(time.time() - t0, 2)
+
+
 def run_script(project: Project, script: str, args: list[str], timeout: int, *, agent: str,
                bus: EventBus | None = None, python: str = sys.executable) -> dict:
     try:
@@ -85,22 +112,11 @@ def run_script(project: Project, script: str, args: list[str], timeout: int, *, 
     metrics_path = root / ".beyondml" / "runs" / run_id / "metrics.json"
     metrics_path.parent.mkdir(parents=True, exist_ok=True)
     env = {**clean_env(os.environ), "BEYONDML_METRICS": str(metrics_path)}
-    kw = ({"creationflags": subprocess.CREATE_NEW_PROCESS_GROUP} if _WIN else {"start_new_session": True})
     before = _snapshot(root)
-    t0 = time.time()
-    timed_out = False
     try:
-        proc = subprocess.Popen([python, str(path), *args], cwd=root, env=env, stdout=subprocess.PIPE,
-                                stderr=subprocess.PIPE, **kw)
+        code, timed_out, out, err, seconds = _spawn([python, str(path), *args], root, env, max(1, min(timeout, 3600)))
     except OSError as e:
         return _fail(str(e))
-    try:
-        out, err = proc.communicate(timeout=timeout)
-    except subprocess.TimeoutExpired:
-        timed_out = True
-        _kill_tree(proc)
-        out, err = proc.communicate()
-    seconds = round(time.time() - t0, 2)
     after = _snapshot(root)
     changed = sorted(k for k, v in after.items() if before.get(k) != v)
     metrics = None
@@ -108,7 +124,6 @@ def run_script(project: Project, script: str, args: list[str], timeout: int, *, 
         metrics = json.loads(metrics_path.read_text(encoding="utf-8"))
     except (OSError, ValueError):
         pass
-    code = proc.returncode
     project.ledger_append({"run_id": run_id, "agent": agent, "script": rel, "args": args, "exit_code": code,
                            "timed_out": timed_out, "seconds": seconds, "files_changed": changed,
                            "metrics": metrics, "data_hash": _data_hash(root)})
@@ -144,14 +159,19 @@ def python_tools(env: ToolEnv, python: str = sys.executable) -> list[Callable]:
         Args:
             name: Package spec, for example "pandas" or "scikit-learn>=1.4".
         """
-        if name.startswith("-") or not _NAME.match(name):
-            return _fail(f"invalid package name: {name}")
+        if (not _NAME.fullmatch(name) or name[0] in "-." or not re.search(r"[A-Za-z0-9]", name)):
+            return _fail(f"invalid package name: {name!r}")
+
+        def go():
+            with _INSTALL_LOCK:  # one pip at a time
+                return _spawn([python, "-m", "pip", "install", name], env.project.root,
+                              clean_env(os.environ), 600)
+
         try:
-            r = await asyncio.to_thread(subprocess.run, [python, "-m", "pip", "install", name],
-                                        capture_output=True, timeout=600)
-        except (OSError, subprocess.TimeoutExpired) as e:
-            return _fail(f"{type(e).__name__}: {e}")
-        return {"ok": r.returncode == 0, "exit_code": r.returncode,
-                "output_tail": _tail((r.stdout or b"") + (r.stderr or b""))}
+            code, timed_out, out, err, _ = await asyncio.to_thread(go)
+        except OSError as e:
+            return _fail(str(e))
+        return {"ok": code == 0 and not timed_out, "exit_code": code,
+                "output_tail": _tail(out + err)}
 
     return [run_python, install_package]

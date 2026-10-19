@@ -112,15 +112,24 @@ async def test_tail_200_lines(tmp_path):
 
 
 async def test_install_package_validates(monkeypatch, tmp_path):
+    import beyondml.toolkit.python as m
     env, t = mk(tmp_path)
-    assert (await t["install_package"]("--index-url=x"))["ok"] is False
-    assert (await t["install_package"]("a; b"))["ok"] is False
+    for bad in ["--index-url=x", "a; b", ".", "..", "pandas\n", "-r", ""]:
+        assert (await t["install_package"](bad))["ok"] is False, bad
     calls = []
 
-    def fake(cmd, **kw):
-        calls.append(cmd)
-        return subprocess.CompletedProcess(cmd, 0, stdout=b"done", stderr=b"")
+    def fake(argv, cwd, env_, timeout):
+        calls.append(argv)
+        return 0, False, b"done", b"", 0.1
 
-    monkeypatch.setattr(subprocess, "run", fake)
+    monkeypatch.setattr(m, "_spawn", fake)
     r = await t["install_package"]("pandas")
     assert r["ok"] and calls == [[sys.executable, "-m", "pip", "install", "pandas"]]
+
+
+async def test_input_does_not_block(tmp_path):
+    env, t = mk(tmp_path)
+    put(env, "src/a.py", "input()")
+    t0 = time.time()
+    r = await t["run_python"]("src/a.py", timeout=30)
+    assert time.time() - t0 < 15 and not r["ok"] and "EOFError" in r["stderr_tail"]
