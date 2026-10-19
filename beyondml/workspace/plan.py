@@ -9,7 +9,13 @@ from dataclasses import asdict, dataclass, field, fields
 from beyondml.workspace.project import Project
 
 STEP_ID = re.compile(r"^[a-z][a-z0-9_]*$")
+STATUSES = ("pending", "running", "done", "failed", "skipped")
 _LISTS = ("depends_on", "inputs", "outputs", "touched")
+
+
+def _strs(v, what: str) -> None:
+    if not isinstance(v, list) or not all(isinstance(x, str) for x in v):
+        raise ValueError(f"{what} must be a list of strings")
 
 
 @dataclass
@@ -47,9 +53,31 @@ class Step:
         for k in _LISTS:
             if not isinstance(d.get(k, []), list):
                 raise ValueError(f"step {d['id']!r}: '{k}' must be a list")
+        sid = d["id"]
+        for k in ("depends_on", "inputs", "outputs"):
+            _strs(d.get(k, []), f"step {sid!r}: '{k}'")
+        if d.get("status", "pending") not in STATUSES:
+            raise ValueError(f"step {sid!r}: invalid status {d['status']!r}")
+        a = d.get("attempts", 0)
+        if isinstance(a, bool) or not isinstance(a, int):
+            raise ValueError(f"step {sid!r}: 'attempts' must be an integer")
+        for k in ("model", "checkpoint"):
+            if d.get(k) is not None and not isinstance(d[k], str):
+                raise ValueError(f"step {sid!r}: '{k}' must be a string or null")
+        for k in ("summary", "last_failure"):
+            if not isinstance(d.get(k, ""), str):
+                raise ValueError(f"step {sid!r}: '{k}' must be a string")
+        _strs(d.get("touched", []), f"step {sid!r}: 'touched'")
         sc = d.get("success_check") or {}
         if not isinstance(sc, dict):
-            raise ValueError(f"step {d['id']!r}: 'success_check' must be an object")
+            raise ValueError(f"step {sid!r}: 'success_check' must be an object")
+        _strs(sc.get("expects", []), f"step {sid!r}: success_check 'expects'")
+        for k in ("run", "metric"):
+            if sc.get(k) is not None and not isinstance(sc[k], str):
+                raise ValueError(f"step {sid!r}: success_check '{k}' must be a string or null")
+        m = sc.get("min")
+        if m is not None and (isinstance(m, bool) or not isinstance(m, (int, float))):
+            raise ValueError(f"step {sid!r}: success_check 'min' must be a number or null")
         known = {f.name for f in fields(cls)} - {"success_check"}
         check = SuccessCheck(**{k: v for k, v in sc.items() if k in {f.name for f in fields(SuccessCheck)}})
         return cls(success_check=check, **{k: v for k, v in d.items() if k in known})
@@ -121,8 +149,12 @@ class Plan:
                 if s.status == "pending" and all(self._status(d) in ("done", "skipped") for d in s.depends_on)]
 
     def blocked(self) -> list[Step]:
-        return [s for s in self.steps
-                if s.status == "pending" and any(self._status(d) == "failed" for d in s.depends_on)]
+        bad = {s.id for s in self.steps if s.status == "failed"}
+        for _ in self.steps:  # fixed point; plan order is not guaranteed topological
+            for s in self.steps:
+                if s.status == "pending" and s.id not in bad and any(d in bad for d in s.depends_on):
+                    bad.add(s.id)
+        return [s for s in self.steps if s.status == "pending" and s.id in bad]
 
     def step(self, step_id: str) -> Step:
         for s in self.steps:
@@ -134,10 +166,11 @@ class Plan:
         return all(s.status in ("done", "failed", "skipped") for s in self.steps)
 
     def merge_revision(self, new: "Plan") -> "Plan":
-        done = {s.id: s for s in self.steps if s.status == "done"}
-        steps = [copy.deepcopy(done.get(s.id, s)) for s in new.steps]
+        keep = {s.id: s for s in self.steps if s.status in ("done", "running")}
+        steps = [copy.deepcopy(keep.get(s.id, s)) for s in new.steps]
+        listed = {s.id for s in new.steps}
+        steps += [copy.deepcopy(s) for s in self.steps if s.id in keep and s.id not in listed]
         return Plan(new.goal, new.metric, copy.deepcopy(new.budget), steps)
-        # ponytail: a done step the revision dropped is not kept; the update_plan tool (Task 5) should reject that
 
 
 def load_plan(project: Project) -> Plan | None:
@@ -148,6 +181,9 @@ def load_plan(project: Project) -> Plan | None:
 def save_plan(project: Project, plan: Plan) -> None:
     project.write("plan.json", json.dumps(plan.to_dict(), indent=2) + "\n")
     rows = ["| id | skill | status | depends_on | goal |", "|---|---|---|---|---|"]
-    rows += [f"| {s.id} | {s.skill} | {s.status} | {', '.join(s.depends_on)} | {s.goal.replace('|', '/')} |"
+    def cell(x: str) -> str:
+        return " ".join(x.split()).replace("|", "\\|")
+
+    rows += [f"| {cell(s.id)} | {cell(s.skill)} | {s.status} | {cell(', '.join(s.depends_on))} | {cell(s.goal)} |"
              for s in plan.steps]
     project.write("PLAN.md", f"# Plan: {plan.goal}\n\n" + "\n".join(rows) + "\n")

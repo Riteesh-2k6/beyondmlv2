@@ -29,7 +29,7 @@ def test_roundtrip(tmp_path):
     assert load_plan(p).to_dict() == plan.to_dict()
     md = p.read("PLAN.md")
     assert md.startswith("# Plan: g")
-    assert "a" in md and "b" in md and "done" in md and "pending" in md
+    assert "| a | eda | pending |" in md and "| b | train | done | a |" in md
 
 
 @pytest.mark.parametrize("mutation,needle", [
@@ -97,3 +97,44 @@ def test_from_dict_rejects_garbage():
 def test_from_dict_ignores_unknown_step_keys():
     plan = make(s("a", extra="ignored"))
     assert plan.step("a").goal == "do it"
+
+
+def test_merge_keeps_omitted_done_step():
+    old = make(s("a"), s("b"))
+    old.step("a").status = "done"
+    merged = old.merge_revision(make(s("c", ["a"])))
+    assert [x.id for x in merged.steps] == ["c", "a"]
+    assert merged.step("a").status == "done"
+    assert merged.validate(SKILLS) == []
+
+
+def test_merge_keeps_running_state():
+    old = make(s("a"))
+    st = old.step("a")
+    st.status, st.checkpoint, st.touched, st.attempts = "running", "abc", ["x"], 1
+    a = old.merge_revision(make(s("a", goal="other"))).step("a")
+    assert (a.status, a.checkpoint, a.touched, a.attempts, a.goal) == ("running", "abc", ["x"], 1, "do it")
+
+
+def test_blocked_is_transitive():
+    plan = make(s("a"), s("b", ["a"]), s("c", ["b"]), s("d"))
+    plan.step("a").status = "failed"
+    assert [x.id for x in plan.blocked()] == ["b", "c"]
+
+
+def test_from_dict_rejects_nested_list_dep():
+    with pytest.raises(ValueError):
+        make(s("a", [["a"]]))
+
+
+def test_from_dict_rejects_unknown_status():
+    with pytest.raises(ValueError):
+        make(s("a", status="bogus"))
+    with pytest.raises(ValueError):
+        make(s("a", attempts=True))
+
+
+def test_plan_md_cells_single_line(tmp_path):
+    p = Project.init(tmp_path)
+    save_plan(p, make(s("a", goal="x|y\nz")))
+    assert "| a | eda | pending |  | x\\|y z |" in p.read("PLAN.md")
