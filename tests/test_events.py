@@ -73,3 +73,40 @@ def test_normalize_bml_event():
 
 def test_normalize_skips_thoughts():
     assert normalize(ev(types.Part(text="x", thought=True))) == []
+
+
+def _bad(out):
+    assert len(out) == 1 and out[0][1] == "error" and out[0][2]["code"] == "bad_event"
+
+
+def test_normalize_malformed_confirmation():
+    for args in ({}, {"originalFunctionCall": {"id": "c"}, "toolConfirmation": {}},
+                 {"originalFunctionCall": "x", "toolConfirmation": {}},
+                 {"originalFunctionCall": {"name": "n"}}):
+        _bad(normalize(ev(types.Part(function_call=types.FunctionCall(id="cf", name="adk_request_confirmation", args=args)))))
+
+
+def test_normalize_bad_bml_event():
+    for v in ({"kind": "nope", "data": {}}, "str", {"data": {}}):
+        _bad(normalize(Event(author="a", invocation_id="i", actions=EventActions(state_delta={"bml_event": v}))))
+
+
+def test_normalize_error_code():
+    e = Event(author="a", invocation_id="i", error_code="X", error_message="m")
+    assert normalize(e) == [("a", "error", {"code": "X", "message": "m"})]
+
+
+def test_normalize_partial_flag():
+    [(_, _, d)] = normalize(ev(types.Part(text="x"), partial=True))
+    assert d["partial"] is True
+
+
+def test_emit_from_worker_thread_reaches_subscriber(tmp_path):
+    bus = EventBus(Project.init(tmp_path))
+
+    async def go():
+        q = bus.subscribe()
+        await asyncio.to_thread(bus.emit, "x", "budget", {"n": 1})
+        return await asyncio.wait_for(q.get(), 2)
+
+    assert asyncio.run(go())["data"] == {"n": 1}
