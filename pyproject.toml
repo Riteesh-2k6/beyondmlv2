@@ -8,7 +8,7 @@ version = "0.1.0"
 description = "AI Agent Orchestration Platform — Terminal-native AutoML with LLM-powered agents and Genetic Algorithm optimization."
 readme = "README.md"
 license = {text = "MIT"}
-requires-python = ">=3.10"
+requires-python = ">=3.11"
 authors = [
     {name = "Riteesh", email = "riteesh@example.com"},
 ]
@@ -17,7 +17,6 @@ classifiers = [
     "Development Status :: 3 - Alpha",
     "Intended Audience :: Developers",
     "Topic :: Scientific/Engineering :: Artificial Intelligence",
-    "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
 ]
@@ -37,6 +36,8 @@ dependencies = [
     "torch>=2.0",
     "torchvision>=0.15",
     "nbformat>=5.0",
+    "google-adk==2.12.0",
+    "litellm>=1.106",
 ]
 
 [project.optional-dependencies]
@@ -52,6 +53,10 @@ beyondml = "beyondml.cli:main"
 [tool.setuptools.packages.find]
 include = ["beyondml*"]
 
+[tool.setuptools.package-data]
+beyondml = ["skills/**/*"]
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 asyncio_mode = "auto"
+filterwarnings = ["ignore:.*JSON_SCHEMA_FOR_FUNC_DECL.*"]
