@@ -32,11 +32,19 @@ class EventBus:
             here = asyncio.get_running_loop()
         except RuntimeError:
             here = None
-        for q, loop in list(self._subs):
-            if loop is None or loop is here:
-                q.put_nowait(event)
-            else:
-                loop.call_soon_threadsafe(q.put_nowait, event)
+        with self._lock:
+            subs = list(self._subs)
+        for sub in subs:
+            q, loop = sub
+            try:
+                if loop is None or loop is here:
+                    q.put_nowait(event)
+                else:
+                    loop.call_soon_threadsafe(q.put_nowait, event)
+            except RuntimeError:  # subscriber's loop is closed: drop it, keep delivering
+                with self._lock:
+                    if sub in self._subs:
+                        self._subs.remove(sub)
         return event
 
     def subscribe(self) -> asyncio.Queue:
@@ -45,11 +53,13 @@ class EventBus:
             loop = asyncio.get_running_loop()
         except RuntimeError:
             loop = None
-        self._subs.append((q, loop))
+        with self._lock:
+            self._subs.append((q, loop))
         return q
 
     def unsubscribe(self, q: asyncio.Queue) -> None:
-        self._subs = [s for s in self._subs if s[0] is not q]
+        with self._lock:
+            self._subs = [s for s in self._subs if s[0] is not q]
 
     def replay(self, since: float | None = None) -> list[dict]:
         out = []

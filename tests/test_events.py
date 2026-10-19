@@ -40,7 +40,8 @@ def test_replay_merges_and_filters(tmp_path):
     first = bus.emit("a", "budget", {})
     bus.emit("b", "budget", {})
     bus.emit("a", "budget", {})
-    (tmp_path / "agents/a/events.jsonl").open("a").write("\nnot json\n")
+    with (tmp_path / "agents/a/events.jsonl").open("a", encoding="utf-8") as f:
+        f.write("\nnot json\n")
     out = bus.replay()
     assert [e["ts"] for e in out] == sorted(e["ts"] for e in out) and len(out) == 3
     assert len(bus.replay(since=first["ts"])) == 2
@@ -110,3 +111,22 @@ def test_emit_from_worker_thread_reaches_subscriber(tmp_path):
         return await asyncio.wait_for(q.get(), 2)
 
     assert asyncio.run(go())["data"] == {"n": 1}
+
+
+def test_emit_survives_closed_loop_subscriber(tmp_path):
+    bus = EventBus(Project.init(tmp_path))
+    dead_loop = asyncio.new_event_loop()
+
+    async def sub():
+        return bus.subscribe()
+
+    dead = dead_loop.run_until_complete(sub())
+    dead_loop.close()
+
+    async def go():
+        live = bus.subscribe()
+        bus.emit("x", "budget", {"n": 1})
+        return await asyncio.wait_for(live.get(), 2)
+
+    assert asyncio.run(go())["data"] == {"n": 1}
+    assert all(q is not dead for q, _ in bus._subs)
