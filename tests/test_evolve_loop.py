@@ -1,4 +1,7 @@
-"""Tests for the evolution engine v2 GA loop (serial)."""
+"""Tests for the evolution engine v2 GA loop.
+
+Tests that count calls or depend on call order pass workers=1: the default is a thread pool.
+"""
 
 import math
 import time
@@ -22,9 +25,12 @@ def test_converges_on_quadratic():
 
 
 def test_same_seed_same_history():
-    runs = [evolve(SPACE, quad, pop_size=8, seed=3) for _ in range(2)]
-    assert [h.best_fitness for h in runs[0].history] == [h.best_fitness for h in runs[1].history]
+    runs = [evolve(SPACE, quad, pop_size=8, workers=1, seed=3) for _ in range(2)]
+    stats = [[(h.gen, h.best_fitness, h.mean_fitness, h.diversity, h.evals, h.best_params) for h in r.history]
+             for r in runs]
+    assert stats[0] == stats[1] and len(stats[0]) > 1
     assert runs[0].best.params == runs[1].best.params
+    assert [c.params for c in runs[0].population] == [c.params for c in runs[1].population]
 
 
 def test_cache_avoids_reevaluation():
@@ -34,7 +40,7 @@ def test_cache_avoids_reevaluation():
         calls.append(params["k"])
         return float(params["k"]), {}
 
-    r = evolve({"k": Choice((1, 2, 3))}, fitness, pop_size=6,
+    r = evolve({"k": Choice((1, 2, 3))}, fitness, pop_size=6, workers=1,
                budget=Budget(max_generations=5, plateau_generations=99), seed=0)
     assert len(r.history) == 5
     assert len(calls) <= 3 and r.evals == len(calls)
@@ -47,7 +53,7 @@ def test_fidelity_promotes_top_fraction():
         rows.append(fid.rows)
         return quad(params, fid)
 
-    evolve(SPACE, fitness, pop_size=10, budget=Budget(max_generations=1),
+    evolve(SPACE, fitness, pop_size=10, workers=1, budget=Budget(max_generations=1),
            fidelity=(Fidelity(0.5, 3), Fidelity()), seed=0)
     assert rows.count(0.5) == 10 and rows.count(1.0) == 3
 
@@ -113,9 +119,12 @@ def test_on_generation_each_gen():
 
 
 def test_invalid_inputs_raise_value_error():
-    for bad in ({"pop_size": 0}, {"fidelity": ()}, {"promote": 0.0}, {"promote": 1.5},
-                {"budget": Budget(max_generations=0)}):
-        with pytest.raises(ValueError):
+    for bad, arg in (({"pop_size": 0}, "pop_size"), ({"fidelity": ()}, "fidelity"),
+                     ({"promote": 0.0}, "promote"), ({"promote": 1.5}, "promote"),
+                     ({"budget": Budget(max_generations=0)}, "max_generations"),
+                     ({"workers": 0}, "workers"), ({"workers": -2}, "workers"),
+                     ({"executor": "fibers"}, "executor")):
+        with pytest.raises(ValueError, match=arg):
             evolve(SPACE, quad, **bad)
 
 
@@ -127,7 +136,7 @@ def test_bad_seed_raises_before_any_evaluation():
         return quad(params, fid)
 
     with pytest.raises(ValueError, match="'bogus'"):
-        evolve(SPACE, fitness, seeds=[{"bogus": 1}])
+        evolve(SPACE, fitness, workers=1, seeds=[{"bogus": 1}])
     assert calls == []
 
 
@@ -158,7 +167,7 @@ def test_promotion_takes_only_finite_candidates():
             ok0.add(params["x"])
         return quad(params, fid)
 
-    evolve(SPACE, fitness, pop_size=20, budget=Budget(max_generations=1),
+    evolve(SPACE, fitness, pop_size=20, workers=1, budget=Budget(max_generations=1),
            fidelity=(Fidelity(0.5, 3), Fidelity()), seed=0)
     assert 0 < len(ok0) < math.ceil(0.3 * 20)    # fewer finite candidates than promotion slots
     assert top == ok0                            # every finite one was promoted, no failed one was
@@ -174,7 +183,7 @@ def test_population_is_ranked_best_first_with_failures_last():
                 raise RuntimeError("top rung failure")
         return quad(params, fid)
 
-    r = evolve(SPACE, fitness, pop_size=10, budget=Budget(max_generations=1),
+    r = evolve(SPACE, fitness, pop_size=10, workers=1, budget=Budget(max_generations=1),
                fidelity=(Fidelity(0.5, 3), Fidelity()), seed=0)
     finite = [math.isfinite(c.fitness) for c in r.population]
     assert finite == sorted(finite, reverse=True) and not all(finite)
@@ -201,7 +210,7 @@ def test_result_bookkeeping():
         calls.append(1)
         return quad(params, fid)
 
-    r = evolve(SPACE, fitness, pop_size=8, budget=Budget(max_generations=4, plateau_generations=99), seed=1)
+    r = evolve(SPACE, fitness, pop_size=8, workers=1, budget=Budget(max_generations=4, plateau_generations=99), seed=1)
     assert r.stop_reason == "generations" and [h.gen for h in r.history] == [1, 2, 3, 4]
     assert r.evals == len(calls) == r.history[-1].evals          # GenStats.evals is cumulative
     assert [h.evals for h in r.history] == sorted(h.evals for h in r.history)

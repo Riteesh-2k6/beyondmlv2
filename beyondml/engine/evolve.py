@@ -5,15 +5,18 @@ over flat params dicts. A conditional Choice (dict options) activates its option
 sub-space; only active keys are present in a params dict.
 
 Loop section: evolve() runs a GA over a Space with a score cache, a fidelity ladder
-(successive promotion of the best candidates to costlier evaluations) and budgets.
+(successive promotion of the best candidates to costlier evaluations), budgets, and one
+persistent worker pool (threads or processes) per call.
 """
 
 from __future__ import annotations
 
 import math
+import os
 import random
 import time
 from collections.abc import Callable, Sequence
+from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor
 from dataclasses import dataclass, field
 
 
@@ -259,13 +262,27 @@ _PLATEAU_DELTA = 1e-4
 def _evaluate(fitness: Fitness, params: dict, fid: Fidelity) -> tuple[float, dict]:
     """One real fitness call. A raising fitness (or a NaN score) is a failed candidate, not a crash."""
     try:
-        score, metrics = fitness(params, fid)
+        score, metrics = fitness(dict(params), fid)   # a copy: a fitness that mutates it must not corrupt the loop
         score = float(score)
         if math.isnan(score):
             raise ValueError("fitness returned NaN")
         return score, dict(metrics)
     except Exception as exc:
         return float("-inf"), {"error": repr(exc)}
+
+
+_FITNESS: Fitness | None = None   # process mode: set once per worker by the pool initializer
+_LADDER: tuple[Fidelity, ...] = ()
+
+
+def _install_fitness(fitness: Fitness, ladder: tuple[Fidelity, ...]) -> None:
+    global _FITNESS, _LADDER
+    _FITNESS, _LADDER = fitness, ladder
+
+
+def _evaluate_installed(params: dict, rung: int) -> tuple[float, dict]:
+    """Process-mode task: only (params, rung) crosses the pipe; errors are already plain data."""
+    return _evaluate(_FITNESS, params, _LADDER[rung])
 
 
 def _rank(c: Candidate) -> tuple:
@@ -277,7 +294,13 @@ def evolve(space: Space, fitness: Fitness, *, pop_size: int = 10, budget: Budget
            workers: int | None = None, executor: str = "threads", fidelity: Sequence[Fidelity] = (Fidelity(),),
            promote: float = 0.3, seeds: Sequence[dict] = (), on_generation: Callable[[GenStats], None] | None = None,
            seed: int = 0) -> EvolveResult:
-    """Run the GA. `workers` and `executor` are accepted but the work runs serially (Task 4)."""
+    """Run the GA.
+
+    One worker pool serves the whole call and is closed when it returns or raises. `executor` is
+    "threads" (the fitness runs in-process) or "processes" (the fitness and the fidelity ladder are
+    pickled once per worker; each task sends only (params, rung)). Results are collected in
+    submission order, so the outcome does not depend on `workers`.
+    """
     if pop_size < 1:
         raise ValueError(f"pop_size must be >= 1, got {pop_size!r}")
     if len(fidelity) < 1:
@@ -286,30 +309,44 @@ def evolve(space: Space, fitness: Fitness, *, pop_size: int = 10, budget: Budget
         raise ValueError(f"promote must be in (0, 1], got {promote!r}")
     if budget.max_generations < 1:
         raise ValueError(f"budget.max_generations must be >= 1, got {budget.max_generations!r}")
+    if workers is not None and workers < 1:
+        raise ValueError(f"workers must be >= 1, got {workers!r}")
+    if executor not in ("threads", "processes"):
+        raise ValueError(f"executor must be 'threads' or 'processes', got {executor!r}")
 
     t0 = time.perf_counter()
     rng = random.Random(seed)
     cache: dict = {}   # (freeze(params), rung) -> (score, metrics), failures included
     top = len(fidelity) - 1
-    n_promote = max(1, math.ceil(promote * pop_size - 1e-9))   # the epsilon keeps 0.7 * 10 at 7, not 8
+    n_promote = max(1, math.ceil(promote * pop_size - 1e-9))   # the epsilon keeps 0.28 * 25 at 7, not 8
     n_elite = max(1, int(_ELITE_FRACTION * pop_size))
     tournament = max(2, min(3, pop_size // 5))
+    max_workers = workers if workers is not None else max(1, (os.cpu_count() or 1) - 1)
 
     population = [complete(space, s, rng) for s in seeds][:pop_size]   # validates every seed up front
     while len(population) < pop_size:
         population.append(sample(space, rng))
 
+    if executor == "processes":
+        pool = ProcessPoolExecutor(max_workers=max_workers, initializer=_install_fitness,
+                                   initargs=(fitness, tuple(fidelity)))
+        task = _evaluate_installed
+    else:
+        pool = ThreadPoolExecutor(max_workers=max_workers)
+
+        def task(params: dict, rung: int) -> tuple[float, dict]:
+            return _evaluate(fitness, params, fidelity[rung])
+
     def score(batch: list[Candidate], rung: int) -> int:
         """Set each candidate's fitness/rung/metrics from its score at `rung`; return real calls made."""
-        pending: dict = {}   # uncached unique (freeze(params), rung) keys, in population order
-        for c in batch:
-            key = (freeze(c.params), rung)
+        keys = [(freeze(c.params), rung) for c in batch]   # once, before any fitness call can see the params
+        pending: dict = {}   # uncached unique keys, in population order
+        for c, key in zip(batch, keys):
             if key not in cache and key not in pending:
                 pending[key] = c.params
-        results = [_evaluate(fitness, p, fidelity[rung]) for p in pending.values()]   # Task 4: pool.map here
-        cache.update(zip(pending, results))
-        for c in batch:
-            c.fitness, c.metrics = cache[(freeze(c.params), rung)]
+        cache.update(zip(pending, pool.map(task, pending.values(), [rung] * len(pending))))   # submission order
+        for c, key in zip(batch, keys):
+            c.fitness, c.metrics = cache[key]
             c.rung = rung
         return len(pending)
 
@@ -318,49 +355,50 @@ def evolve(space: Space, fitness: Fitness, *, pop_size: int = 10, budget: Budget
     evals = 0
     stalled = 0
     prev_best = float("-inf")
-    for gen in range(1, budget.max_generations + 1):
-        cands = [Candidate(p) for p in population]
-        batch = cands
-        for rung in range(top + 1):
-            if rung:   # promote the best finite scorers of the previous rung
-                batch = sorted((c for c in batch if math.isfinite(c.fitness)),
-                               key=lambda c: c.fitness, reverse=True)[:n_promote]
-            evals += score(batch, rung)
-        ranked = sorted(cands, key=_rank, reverse=True)
+    with pool:
+        for gen in range(1, budget.max_generations + 1):
+            cands = [Candidate(p) for p in population]
+            batch = cands
+            for rung in range(top + 1):
+                if rung:   # promote the best finite scorers of the previous rung
+                    batch = sorted((c for c in batch if math.isfinite(c.fitness)),
+                                   key=lambda c: c.fitness, reverse=True)[:n_promote]
+                evals += score(batch, rung)
+            ranked = sorted(cands, key=_rank, reverse=True)
 
-        for c in cands:
-            if c.rung == top and (best is None or c.fitness > best.fitness):
-                best = Candidate(c.params, c.fitness, c.rung, c.metrics)
-        if gen == 1 and (best is None or not math.isfinite(best.fitness)):
-            first = next((c.metrics["error"] for c in cands if "error" in c.metrics), None)
-            raise EvolveError(f"every candidate failed; first error: {first}")
+            for c in cands:
+                if c.rung == top and (best is None or c.fitness > best.fitness):
+                    best = Candidate(c.params, c.fitness, c.rung, c.metrics)
+            if gen == 1 and (best is None or not math.isfinite(best.fitness)):
+                first = next((c.metrics["error"] for c in cands if "error" in c.metrics), None)
+                raise EvolveError(f"every candidate failed; first error: {first}")
 
-        finite = [c.fitness for c in cands if math.isfinite(c.fitness)]
-        elapsed = time.perf_counter() - t0
-        stats = GenStats(gen, best.fitness, sum(finite) / len(finite) if finite else float("-inf"),
-                         best.params, evals, elapsed, len({freeze(c.params) for c in cands}) / pop_size)
-        history.append(stats)
-        if on_generation is not None:
-            on_generation(stats)
+            finite = [c.fitness for c in cands if math.isfinite(c.fitness)]
+            elapsed = time.perf_counter() - t0
+            stats = GenStats(gen, best.fitness, sum(finite) / len(finite) if finite else float("-inf"),
+                             best.params, evals, elapsed, len({freeze(c.params) for c in cands}) / pop_size)
+            history.append(stats)
+            if on_generation is not None:
+                on_generation(stats)
 
-        stalled = 0 if best.fitness - prev_best >= _PLATEAU_DELTA else stalled + 1
-        prev_best = best.fitness
-        if budget.max_evals is not None and evals >= budget.max_evals:
-            reason = "evals"
-        elif budget.max_seconds is not None and elapsed >= budget.max_seconds:
-            reason = "seconds"
-        elif stalled >= budget.plateau_generations:
-            reason = "plateau"
-        elif gen == budget.max_generations:
-            reason = "generations"
-        else:
-            reason = None
-        if reason:
-            return EvolveResult(best, history, ranked, evals, time.perf_counter() - t0, reason)
+            stalled = 0 if best.fitness - prev_best >= _PLATEAU_DELTA else stalled + 1
+            prev_best = best.fitness
+            if budget.max_evals is not None and evals >= budget.max_evals:
+                reason = "evals"
+            elif budget.max_seconds is not None and elapsed >= budget.max_seconds:
+                reason = "seconds"
+            elif stalled >= budget.plateau_generations:
+                reason = "plateau"
+            elif gen == budget.max_generations:
+                reason = "generations"
+            else:
+                reason = None
+            if reason:
+                return EvolveResult(best, history, ranked, evals, time.perf_counter() - t0, reason)
 
-        population = [c.params for c in ranked[:n_elite]]   # elites carry over; next generation they are cache hits
-        while len(population) < pop_size:
-            pa, pb = (max(rng.sample(ranked, min(tournament, len(ranked))), key=_rank) for _ in range(2))
-            for child in crossover(space, pa.params, pb.params, rng):
-                if len(population) < pop_size:
-                    population.append(mutate(space, child, rng))
+            population = [c.params for c in ranked[:n_elite]]   # elites carry over; next generation they are cache hits
+            while len(population) < pop_size:
+                pa, pb = (max(rng.sample(ranked, min(tournament, len(ranked))), key=_rank) for _ in range(2))
+                for child in crossover(space, pa.params, pb.params, rng):
+                    if len(population) < pop_size:
+                        population.append(mutate(space, child, rng))
