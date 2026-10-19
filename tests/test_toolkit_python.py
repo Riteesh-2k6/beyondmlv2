@@ -1,3 +1,4 @@
+import asyncio
 import subprocess
 import sys
 import time
@@ -118,7 +119,7 @@ async def test_install_package_validates(monkeypatch, tmp_path):
         assert (await t["install_package"](bad))["ok"] is False, bad
     calls = []
 
-    def fake(argv, cwd, env_, timeout):
+    def fake(argv, cwd, env_, timeout, *files):
         calls.append(argv)
         return 0, False, b"done", b"", 0.1
 
@@ -133,3 +134,21 @@ async def test_input_does_not_block(tmp_path):
     t0 = time.time()
     r = await t["run_python"]("src/a.py", timeout=30)
     assert time.time() - t0 < 15 and not r["ok"] and "EOFError" in r["stderr_tail"]
+
+
+
+ORPHAN = r'''
+import subprocess, sys, time
+mid = "import subprocess, sys; subprocess.Popen([sys.executable, '-c', 'import time; time.sleep(30)'])"
+subprocess.run([sys.executable, "-c", mid])
+time.sleep(60)
+'''
+
+
+async def test_orphan_holding_output_does_not_hang(tmp_path):
+    from beyondml.toolkit.python import run_script
+    env, t = mk(tmp_path)
+    put(env, "src/a.py", ORPHAN)
+    t0 = time.time()
+    r = await asyncio.to_thread(run_script, env.project, "src/a.py", [], 2, agent="s1")
+    assert time.time() - t0 < 10 and r["timed_out"]

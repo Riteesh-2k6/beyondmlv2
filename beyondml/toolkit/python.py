@@ -73,29 +73,25 @@ def _fail(error: str) -> dict:
     return {"ok": False, "error": error}
 
 
-def _spawn(argv: list[str], cwd: Path, env: dict, timeout: int) -> tuple[int | None, bool, bytes, bytes, float]:
-    """Run argv; on timeout kill the whole tree and wait at most 5 s more. Always returns."""
+def _spawn(argv: list[str], cwd: Path, env: dict, timeout: int, out_path: Path,
+           err_path: Path) -> tuple[int | None, bool, bytes, bytes, float]:
+    """Run argv with output going to files (a surviving descendant can't block us on a pipe).
+    On timeout kill the tree and wait at most 5 s for the direct process. Always returns."""
     kw = ({"creationflags": subprocess.CREATE_NEW_PROCESS_GROUP} if _WIN else {"start_new_session": True})
     t0 = time.time()
-    proc = subprocess.Popen(argv, cwd=cwd, env=env, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE,
-                            stderr=subprocess.PIPE, **kw)
     timed_out = False
-    try:
-        out, err = proc.communicate(timeout=timeout)
-    except subprocess.TimeoutExpired as e:
-        timed_out = True
-        out, err = e.stdout or b"", e.stderr or b""
-        _kill_tree(proc)
+    with open(out_path, "wb") as fo, open(err_path, "wb") as fe:
+        proc = subprocess.Popen(argv, cwd=cwd, env=env, stdin=subprocess.DEVNULL, stdout=fo, stderr=fe, **kw)
         try:
-            out, err = proc.communicate(timeout=5)
-        except subprocess.TimeoutExpired as e2:
-            out, err = e2.stdout or out, e2.stderr or err
-            for f in (proc.stdout, proc.stderr):
-                try:
-                    f.close()
-                except OSError:
-                    pass
-    return proc.returncode, timed_out, out, err, round(time.time() - t0, 2)
+            proc.wait(timeout=timeout)
+        except subprocess.TimeoutExpired:
+            timed_out = True
+            _kill_tree(proc)
+            try:
+                proc.wait(timeout=5)
+            except subprocess.TimeoutExpired:
+                pass
+    return proc.poll(), timed_out, out_path.read_bytes(), err_path.read_bytes(), round(time.time() - t0, 2)
 
 
 def run_script(project: Project, script: str, args: list[str], timeout: int, *, agent: str,
@@ -114,7 +110,8 @@ def run_script(project: Project, script: str, args: list[str], timeout: int, *, 
     env = {**clean_env(os.environ), "BEYONDML_METRICS": str(metrics_path)}
     before = _snapshot(root)
     try:
-        code, timed_out, out, err, seconds = _spawn([python, str(path), *args], root, env, max(1, min(timeout, 3600)))
+        code, timed_out, out, err, seconds = _spawn([python, str(path), *args], root, env, max(1, min(timeout, 3600)),
+                                                   metrics_path.parent / "stdout.txt", metrics_path.parent / "stderr.txt")
     except OSError as e:
         return _fail(str(e))
     after = _snapshot(root)
@@ -163,9 +160,11 @@ def python_tools(env: ToolEnv, python: str = sys.executable) -> list[Callable]:
             return _fail(f"invalid package name: {name!r}")
 
         def go():
+            d = env.project.root / ".beyondml" / "runs" / f"install-{uuid.uuid4().hex[:8]}"
+            d.mkdir(parents=True, exist_ok=True)
             with _INSTALL_LOCK:  # one pip at a time
                 return _spawn([python, "-m", "pip", "install", name], env.project.root,
-                              clean_env(os.environ), 600)
+                              clean_env(os.environ), 600, d / "stdout.txt", d / "stderr.txt")
 
         try:
             code, timed_out, out, err, _ = await asyncio.to_thread(go)
