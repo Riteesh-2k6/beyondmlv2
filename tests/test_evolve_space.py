@@ -74,12 +74,12 @@ def test_crossover_keeps_choice_consistency():
 
 
 def test_complete_rejects_unknown_key():
-    with pytest.raises(ValueError, match="bogus"):
+    with pytest.raises(ValueError, match=r"'bogus'"):
         complete(SPACE, {"bogus": 1}, random.Random(0))
 
 
 def test_complete_rejects_out_of_range():
-    with pytest.raises(ValueError, match="n"):
+    with pytest.raises(ValueError, match=r"'n'"):
         complete(SPACE, {"n": 99}, random.Random(0))
 
 
@@ -112,6 +112,24 @@ def test_single_option_conditional_still_mutates_subkeys():
     rng = random.Random(6)
     out = {mutate(space, {"model": "only", "x": 0.5}, rng, rate=1.0)["x"] for _ in range(20)}
     assert 0.5 not in out and all(0.0 <= x <= 1.0 for x in out)
+
+
+def test_mask_bits_flip_at_rate_not_rate_squared():
+    # v1 flipped each feature bit at 0.15; gating the whole mask on the rate as well would give ~0.2 flips
+    rng = random.Random(16)
+    m = (1,) * 10
+    flips = sum(sum(a != b for a, b in zip(m, mutate({"m": Mask(10)}, {"m": m}, rng, rate=0.15)["m"]))
+                for _ in range(2000)) / 2000
+    assert 1.3 < flips < 1.7
+
+
+def test_mutate_float_with_int_bounds_returns_float():
+    rng = random.Random(17)
+    v = 0.0   # half the gaussian steps fall below the lower bound and are clipped
+    for _ in range(200):
+        v = mutate({"x": Float(0, 1)}, {"x": v}, rng, rate=1.0)["x"]
+        assert isinstance(v, float) and 0.0 <= v <= 1.0
+    assert isinstance(sample({"x": Float(0, 1)}, rng)["x"], float)
 
 
 def test_mutate_rate_zero_is_identity():
@@ -209,7 +227,7 @@ def test_complete_samples_missing_subkeys_of_given_choice():
     ({"features": "111"}, "features"),                        # wrong type
 ])
 def test_complete_rejects_invalid_tabular_seeds(partial, key):
-    with pytest.raises(ValueError, match=key):
+    with pytest.raises(ValueError, match=f"'{key}'"):
         complete(TAB, partial, random.Random(0))
 
 
@@ -218,7 +236,7 @@ def test_complete_rejects_invalid_tabular_seeds(partial, key):
     ({"lr": 1.0}, "lr"), ({"lr": float("nan")}, "lr"),
 ])
 def test_complete_rejects_bad_numbers(partial, key):
-    with pytest.raises(ValueError, match=key):
+    with pytest.raises(ValueError, match=f"'{key}'"):
         complete(SPACE, partial, random.Random(0))
 
 
@@ -230,7 +248,7 @@ def test_complete_accepts_integral_float_for_int_and_int_for_float():
 def test_complete_validates_before_sampling():
     rng = random.Random(15)
     state = rng.getstate()
-    with pytest.raises(ValueError, match="n"):
+    with pytest.raises(ValueError, match=r"'n'"):
         complete(SPACE, {"n": 99}, rng)
     assert rng.getstate() == state
 
