@@ -23,7 +23,11 @@
 
 **Retired:** `tui_app.py`, `beyondml/web/{server,models,runner,markup}.py`, `tests/test_web_server.py`, `beyondml web`. `pyproject.toml` now declares `fastapi`, `uvicorn`, `python-multipart` (the old server used them undeclared) and `httpx` for tests.
 
-**Tests:** `tests/test_session.py` (7), `tests/test_gateway.py` (13, real uvicorn on a random port for SSE), `tests/test_tui.py` (12, Textual pilot), plus the CLI additions. Full suite after the merge: see the verification line below.
+**Tests:** `tests/test_session.py` (9), `tests/test_gateway.py` (11, real uvicorn on a random port for SSE), `tests/test_tui.py` (13, Textual pilot), plus the CLI additions.
+
+**Verification (2026-10-21, after merging `harness/core` at `a7ac96c`):** full suite `243 passed, 2 skipped, 0 failed` (merged main had 288; this branch retires the 78 legacy web-server tests and adds 33). `npm run build` passes. The TUI was launched on a project with a finished scripted run and rendered the plan board, graph and chat history.
+
+**Finish review (impeccable, fresh read-only subagent):** round 1 `disposition: fix` with seven material fixes; all applied. Verdict pass: six resolved, one partial (the pending-prompt cues had not been recaptured) plus one regression (a doubled chevron and arrow on log rows), `disposition: fix`. Both were then addressed (the waiting badge and dock link are orange in `.impeccable/review/desktop-plan-modal.jpg`; the arrows are gone) but not re-scored, because two rounds is the budget for an unattended run.
 
 ## How to try it
 
@@ -45,6 +49,7 @@ Build the web UI once with `cd beyondml/web/ui && npm install && npm run build`;
 - **Code preview is untinted** in the web files view (the reviewer's ceiling note); a small tokenizer would add syntax colour.
 - **Projects registry is in memory** (ruling 10); projects opened from the web are forgotten on restart.
 - Impeccable reports `PRODUCT.md` as a legacy schema (`route: init`); not acted on, as instructed by the skill.
+- Two processes on one project are not supported: a new `Session` closes any prompt still open on disk, on the assumption that its owner has exited.
 
 ## Rulings
 
