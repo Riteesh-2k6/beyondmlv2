@@ -24,7 +24,8 @@ async def _pump(queue: asyncio.Queue, on_event: Callable[[dict], None]) -> None:
 
 async def run_goal(root: Path, goal: str | None, data: Sequence[Path] = (), *, mode: str | None = None,
                    model: str | None = None, resolver: ModelResolver | None = None,
-                   asker: Asker, approver: Approver, on_event: Callable[[dict], None] | None = None) -> Plan:
+                   asker: Asker, approver: Approver, on_event: Callable[[dict], None] | None = None,
+                   bus: EventBus | None = None) -> Plan:
     root = Path(root)
     project = Project.open(root) if (root / ".beyondml").is_dir() else Project.init(root, goal)
     for path in data:
@@ -36,7 +37,7 @@ async def run_goal(root: Path, goal: str | None, data: Sequence[Path] = (), *, m
     mode = mode or settings["run"]["mode"]
     base = resolver or default_resolver(project)
     resolve = (lambda name, requested=None: base(name, model)) if model else base
-    bus = EventBus(project)
+    bus = bus or EventBus(project)
     pump = asyncio.create_task(_pump(bus.subscribe(), on_event)) if on_event else None
     try:
         plan = load_plan(project)
