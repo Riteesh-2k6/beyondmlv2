@@ -5,6 +5,7 @@ Usage:
     beyondml                          Launch the interactive TUI (legacy, until the new TUI lands)
     beyondml init [DIR] --goal TEXT   Create a BeyondML project folder
     beyondml run [GOAL] --data PATH   Plan and build an ML project headless, printing every agent event
+    beyondml serve                    Run the gateway headless (REST, SSE, web UI)
     beyondml benchmark                Run PMLB benchmark suite
     beyondml --version                Show version
 """
@@ -137,29 +138,31 @@ def benchmark(datasets):
     asyncio.run(runner.run_benchmark())
 
 
+def _open_session(project_dir, **kw):
+    """A Session on an existing project, or exit 2 with the init hint."""
+    from beyondml.gateway.session import Session
+
+    root = Path(project_dir)
+    if not (root / ".beyondml").is_dir():
+        click.echo(f"{root.resolve()} is not a BeyondML project. Run `beyondml init` there first.", err=True)
+        sys.exit(2)
+    return Session(root, **kw)
+
+
 @main.command()
-@click.option("--port", default=7777, show_default=True, help="Port for the web server.")
-@click.option("--no-browser", is_flag=True, default=False, help="Don't open browser automatically.")
-def web(port, no_browser):
-    """Launch the BeyondML Web UI (FastAPI + React)."""
-    import threading
-    import time
-    import webbrowser
-    import uvicorn
+@click.option("--project", "project_dir", default=".", show_default=True, type=click.Path(file_okay=False))
+@click.option("--host", default="127.0.0.1", show_default=True, help="Bind address; loopback by default.")
+@click.option("--port", default=7777, show_default=True)
+@click.option("--mode", type=click.Choice(["ask", "auto", "autonomous"]), default=None)
+@click.option("--model", default=None, help="Model for every agent, e.g. ollama_chat/qwen2.5:14b.")
+def serve(project_dir, host, port, mode, model):
+    """Run the gateway headless: REST, SSE events and the web UI for one project."""
+    from beyondml.gateway.app import create_app
+    from beyondml.gateway.serve import run_foreground
 
-    def _open():
-        time.sleep(1.5)
-        if not no_browser:
-            webbrowser.open(f"http://localhost:{port}")
-
-    threading.Thread(target=_open, daemon=True).start()
-    uvicorn.run(
-        "beyondml.web.server:app",
-        host="0.0.0.0",
-        port=port,
-        reload=False,
-        log_level="info",
-    )
+    session = _open_session(project_dir, mode=mode, model=model)
+    click.echo(f"BeyondML gateway on http://{host}:{port} for {session.project.root.resolve()}")
+    run_foreground(create_app({session.name: session}), host, port)
 
 
 if __name__ == "__main__":
