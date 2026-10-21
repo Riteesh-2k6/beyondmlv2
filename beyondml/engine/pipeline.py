@@ -14,7 +14,7 @@ from sklearn.preprocessing import OneHotEncoder, StandardScaler
 from sklearn.svm import SVC, SVR
 from sklearn.tree import DecisionTreeClassifier, DecisionTreeRegressor
 
-MODEL_NAMES = ("RandomForest", "LogisticRegression", "LinearRegression", "SVM", "DecisionTree", "KNN",
+MODEL_NAMES = ("RandomForest", "LogisticRegression", "LinearRegression", "SVM", "DecisionTree", "KNN", "MLP",
                "GradientBoosting")
 
 
@@ -36,6 +36,9 @@ def make_model(name: str, classification: bool, hp: dict, class_weight: str | No
                 else GradientBoostingRegressor(**hp, random_state=42))
     if name == "LinearRegression":
         return LinearRegression()
+    if name == "MLP":  # torch loads only when an MLP is actually built
+        from .mlp import TorchMLPClassifier, TorchMLPRegressor
+        return TorchMLPClassifier(**hp) if classification else TorchMLPRegressor(**hp)
     raise ValueError(f"unknown model {name!r}; expected one of {MODEL_NAMES}")
 
 

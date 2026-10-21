@@ -45,6 +45,13 @@ _MODEL_TABLE: dict[str, tuple[tuple[str, ...], dict, dict]] = {
         "learning_rate": Choice((0.01, 0.05, 0.1, 0.2)),
         "max_depth": Choice((3, 5, 7, 9)),
     }, {"n_estimators": 100, "learning_rate": 0.1, "max_depth": 3}),
+    "MLP": (_BOTH, {   # torch, engine/mlp.py; opt-in only (not in DEFAULT_MODELS)
+        "hidden": Choice(((32,), (64,), (64, 32), (128, 64))),
+        "lr": Float(1e-4, 1e-2, log=True),
+        "epochs": Choice((20, 40, 80)),
+        "dropout": Choice((0.0, 0.1, 0.3)),
+        "batch_size": Choice((32, 64, 128)),
+    }, {"hidden": (64, 32), "lr": 1e-3, "epochs": 40, "dropout": 0.1, "batch_size": 64}),
 }
 
 MODELS = tuple(_MODEL_TABLE)
