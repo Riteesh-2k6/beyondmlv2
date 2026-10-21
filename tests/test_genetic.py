@@ -69,6 +69,8 @@ def test_history_keys_callback_and_population(classification_df, classification_
     assert seen == history and 1 <= len(history) <= 2
     assert set(history[0]) == {"gen", "best_fitness", "avg_fitness", "best_model", "num_features", "best_hparams"}
     assert history[0]["gen"] == 1 and history[0]["best_model"] == "RandomForest"
-    assert [g.fitness for g in opt.population] == sorted((g.fitness for g in opt.population), reverse=True)
+    # best-first means rung first: a screening score is not comparable to a full-ladder score
+    order = [(g.rung, g.fitness) for g in opt.population]
+    assert order == sorted(order, reverse=True) and best.rung == 1
     assert "model" not in best.hparams and "features" not in best.hparams and len(best.feature_mask) == 5
     assert best.metrics["mu_cv"] > 0 and best.fitness == opt.population[0].fitness

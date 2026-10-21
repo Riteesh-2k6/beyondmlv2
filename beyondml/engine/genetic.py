@@ -34,11 +34,12 @@ class Genome:
     feature_mask: List[int]
     fitness: float
     metrics: dict = field(default_factory=dict)
+    rung: int = -1   # fidelity rung the score came from; scores from different rungs are not comparable
 
     @classmethod
     def from_candidate(cls, c: Candidate) -> "Genome":
         p = c.params
-        return cls(p["model"], _hparams(p), list(p["features"]), c.fitness, dict(c.metrics))
+        return cls(p["model"], _hparams(p), list(p["features"]), c.fitness, dict(c.metrics), c.rung)
 
 
 def _round4(x: float) -> float:

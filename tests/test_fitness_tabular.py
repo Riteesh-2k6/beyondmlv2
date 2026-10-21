@@ -191,3 +191,33 @@ def test_fitness_lets_errors_propagate(classification_df, classification_profile
         fit({"model": "NoSuchModel", "features": (1,) * X.shape[1]}, Fidelity(1.0, 3))
     with pytest.raises(ValueError):   # a model that cannot fit this problem type must not score -1.0 quietly
         fit({"model": "LinearRegression", "features": (1,) * X.shape[1]}, Fidelity(1.0, 3))
+
+
+def test_rare_class_reduces_folds_at_low_fidelity():
+    # 400 rows, 8 of one class; a stratified half keeps 4, so 5 folds drop to 4 (Review Focus 5 at a low rung)
+    rng = np.random.RandomState(0)
+    df = pd.DataFrame({"x": rng.normal(size=400), "target": [0] * 392 + [1] * 8})
+    X, y = _split(df)
+    profile = {"target_analysis": {"target_type": "classification", "imbalance_risk": True},
+               "overfitting_risk_index": {"score": 0.5}}
+    fit = TabularFitness(X, y, "classification", profile)
+    seed = warm_seeds("classification", 1, models=("DecisionTree",))[0]
+    m = fit(seed, Fidelity(rows=0.5, folds=5))[1]
+    assert (m["n_rows"], m["folds"]) == (200, 4)
+    assert fit(seed, Fidelity(rows=1.0, folds=5))[1]["folds"] == 5
+
+
+def test_fitness_pickles_and_runs_in_processes(classification_df, classification_profile):
+    import math
+    import pickle
+    from beyondml.engine.evolve import evolve
+
+    X, y = _split(classification_df)
+    fit = TabularFitness(X, y, "classification", classification_profile, cv_jobs=1)
+    seed = warm_seeds("classification", X.shape[1], models=("DecisionTree",))[0]
+    assert pickle.loads(pickle.dumps(fit))(seed, Fidelity(1.0, 3)) == fit(seed, Fidelity(1.0, 3))
+    # the >= 20k-row path: the fitness travels to spawned workers once and scores there with serial folds
+    r = evolve(tabular_space("classification", X.shape[1], ("DecisionTree",)), fit, pop_size=3,
+               budget=Budget(max_generations=2), executor="processes", workers=2,
+               fidelity=default_ladder(200), seeds=[seed], seed=0)
+    assert math.isfinite(r.best.fitness) and r.best.rung == 1 and r.best.metrics["folds"] == 5

@@ -11,13 +11,18 @@ persistent worker pool (threads or processes) per call.
 
 from __future__ import annotations
 
+import logging
 import math
+import multiprocessing
 import os
 import random
+import sys
 import time
 from collections.abc import Callable, Sequence
 from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor
 from dataclasses import dataclass, field
+
+log = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
@@ -329,8 +334,11 @@ def evolve(space: Space, fitness: Fitness, *, pop_size: int = 10, budget: Budget
         population.append(sample(space, rng))
 
     if executor == "processes":
-        pool = ProcessPoolExecutor(max_workers=max_workers, initializer=_install_fitness,
-                                   initargs=(fitness, tuple(fidelity)))
+        # spawn everywhere: a fork from the threaded TUI/web host can deadlock and skips the initializer
+        # pickling the tests exercise; Windows refuses more than 61 process workers
+        pool = ProcessPoolExecutor(max_workers=min(max_workers, 61) if sys.platform == "win32" else max_workers,
+                                   mp_context=multiprocessing.get_context("spawn"),
+                                   initializer=_install_fitness, initargs=(fitness, tuple(fidelity)))
         task = _evaluate_installed
     else:
         pool = ThreadPoolExecutor(max_workers=max_workers)
@@ -375,6 +383,10 @@ def evolve(space: Space, fitness: Fitness, *, pop_size: int = 10, budget: Budget
                 raise EvolveError(f"every candidate failed; first error: {first}")
 
             finite = [c.fitness for c in cands if math.isfinite(c.fitness)]
+            if len(finite) < len(cands):   # a model family that always fails must not vanish in silence
+                first = next(c.metrics.get("error") for c in cands if not math.isfinite(c.fitness))
+                log.warning("generation %d: %d of %d candidates failed; first error: %s",
+                            gen, len(cands) - len(finite), len(cands), first)
             elapsed = time.perf_counter() - t0
             stats = GenStats(gen, best.fitness, sum(finite) / len(finite) if finite else float("-inf"),
                              best.params, evals, elapsed, len({freeze(c.params) for c in cands}) / pop_size)

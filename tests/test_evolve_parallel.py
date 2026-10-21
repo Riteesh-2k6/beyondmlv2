@@ -143,3 +143,23 @@ def test_promotion_count_keeps_the_float_epsilon():
     evolve(SPACE, fitness, pop_size=25, workers=1, promote=0.28, budget=Budget(max_generations=1),
            fidelity=(Fidelity(0.5, 3), Fidelity()), seed=0)
     assert rows.count(0.5) == 25 and rows.count(1.0) == 7
+
+
+def test_process_pool_uses_spawn_and_caps_windows_workers(monkeypatch):
+    """Shipped behaviour must equal tested behaviour: fork from a threaded host (Linux default) would skip
+    the initializer pickling and can deadlock; Windows refuses more than 61 process workers."""
+    import sys
+    from concurrent.futures import ThreadPoolExecutor
+
+    seen = {}
+
+    class Recording(ThreadPoolExecutor):   # stands in for the process pool and records its kwargs
+        def __init__(self, max_workers=None, **kw):
+            seen.update(kw, max_workers=max_workers)
+            super().__init__(max_workers=4, initializer=kw.get("initializer"), initargs=kw.get("initargs", ()))
+
+    monkeypatch.setattr(evolve_module, "ProcessPoolExecutor", Recording)
+    monkeypatch.setattr(evolve_module.os, "cpu_count", lambda: 100)
+    evolve(SPACE, quad, pop_size=4, budget=Budget(max_generations=1), executor="processes")
+    assert seen["mp_context"].get_start_method() == "spawn"
+    assert seen["max_workers"] == (61 if sys.platform == "win32" else 99)

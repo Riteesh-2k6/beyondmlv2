@@ -158,9 +158,9 @@ class GATrainerAgent:
         await log(f"  Best Model: {best_genome.model_choice}")
         await log(f"  Best Params: {best_genome.hparams}")
 
-        # Expose sorted population for ensemble stacking
-        sorted_pop = sorted(optimizer.population, key=lambda x: x.fitness, reverse=True)
-        top_n = sorted_pop[:min(5, len(sorted_pop))]
+        # Expose the population for ensemble stacking. It is already best-first and rung-aware; a re-sort by
+        # raw fitness would let a screening-rung score outrank one scored on the full ladder.
+        top_n = optimizer.population[:5]
         await log(f"  Top-{len(top_n)} genomes ready for ensemble stacking")
 
         return {

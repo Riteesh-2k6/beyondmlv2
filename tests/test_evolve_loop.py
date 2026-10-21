@@ -218,3 +218,16 @@ def test_result_bookkeeping():
     assert r.history[-1].seconds <= r.seconds
     assert len(r.population) == 8 and r.best.rung == 0
     assert r.history[-1].best_fitness == r.best.fitness and r.history[-1].best_params == r.best.params
+
+
+def test_partial_failures_are_logged(caplog):
+    import logging
+
+    def picky(params, fid):
+        if params["x"] < 0:
+            raise ValueError("negative x")
+        return quad(params, fid)
+
+    with caplog.at_level(logging.WARNING, logger="beyondml.engine.evolve"):
+        evolve(SPACE, picky, pop_size=10, budget=Budget(max_generations=1), workers=1, seed=0)
+    assert "failed" in caplog.text and "ValueError('negative x')" in caplog.text
