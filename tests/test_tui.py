@@ -118,3 +118,39 @@ async def test_run_form_starts_a_run_when_there_is_no_plan(tmp_path):
         await until(pilot, lambda: session.run_task.done())
         await until(pilot, lambda: len(app.query(StepCard)) == 1)
         assert load_plan(session.project).step("a").status == "done"
+
+
+def gen(n, best, mean, div):
+    return {"gen": n, "best_fitness": best, "mean_fitness": mean, "diversity": div, "evals": 10 * n,
+            "seconds": 2.5 * n, "best_params": {"model": "rf", "n_estimators": 100 + n}}
+
+
+async def test_agent_screen_tabs(tmp_path):
+    session = with_plan(tmp_path)
+    session.project.write("agents/prepare/instruction.md", "# prepare\nexactly this text")
+    bus = session.bus
+    bus.emit("prepare", "tool_call", {"id": "1", "name": "write_file", "args": {"path": "src/prepare.py"}})
+    bus.emit("prepare", "tool_result", {"id": "1", "name": "write_file", "response": {"ok": True}})
+    bus.emit("prepare", "artifact", {"path": "src/prepare.py"})
+    bus.emit("prepare", "message_delta", {"text": "wrote the script", "partial": False})
+    bus.emit("prepare", "chart", {"title": "missing by column", "kind": "bar", "x": [1, 2, 3],
+                                  "series": {"missing": [0.1, 0.0, 0.4]}})
+    bus.emit("train", "tool_call", {"id": "9", "name": "run_python", "args": {"script": "src/train.py"}})
+    app = BeyondMLApp(session)
+    async with app.run_test(size=SIZE) as pilot:
+        await until(pilot, lambda: len(app.query(StepCard)) == 2)
+        app.open_agent("prepare")
+        await until(pilot, lambda: app.agent_view.info is not None)
+        view = app.agent_view
+        assert view.info["instruction"] == "# prepare\nexactly this text" and "run_python" in view.info["tools"]
+        assert any("write_file" in line for line in view.live_lines) and not any("run_python" in l for l in view.live_lines)
+        assert "wrote the script" in "\n".join(view.live_lines)
+        assert "src/prepare.py" in view.outputs_text and "missing by column" in view.outputs_text
+        assert view.evolve_text == ""
+        bus.emit("prepare", "tool_call", {"id": "2", "name": "run_python", "args": {"script": "src/prepare.py"}})
+        await until(pilot, lambda: any("run_python" in line for line in view.live_lines))
+        for n, (b, m, d) in enumerate([(0.5, 0.3, 1.0), (0.7, 0.5, 0.8), (0.82, 0.6, 0.6)], start=1):
+            bus.emit("prepare", "generation", gen(n, b, m, d))
+        await until(pilot, lambda: "generation 3" in view.evolve_text)
+        assert "0.82" in view.evolve_text and "n_estimators  103" in view.evolve_text
+        assert "fitness per generation" in view.evolve_text and "diversity" in view.evolve_text

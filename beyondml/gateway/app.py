@@ -14,16 +14,13 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
 from beyondml.gateway.session import Session
-from beyondml.gateway.state import SessionState, plan_view
-from beyondml.harness.lead import LEAD_TOOLS
-from beyondml.harness.skills import discover
+from beyondml.gateway.state import SessionState, agent_view, plan_view
 from beyondml.workspace.events import EventBus
 from beyondml.workspace.plan import load_plan
 from beyondml.workspace.project import PathError, ProjectError
 
 DIST = Path(__file__).resolve().parent.parent / "web" / "ui" / "dist"
 PING_SECONDS = 15.0
-FIXED_TOOLS = {"intake": [], "planner": ["submit_plan"], "lead": sorted(LEAD_TOOLS), "executor": []}
 
 
 class ProjectCreate(BaseModel):
@@ -127,28 +124,10 @@ def create_app(registry: dict[str, Session], dist: Path | None = DIST) -> FastAP
     @app.get("/projects/{p}/agents/{agent_id}")
     def agent(p: str, agent_id: str):
         session = get(p)
-        project = session.project
-        instruction = project.read(f"agents/{agent_id}/instruction.md")
-        try:
-            current = load_plan(project)
-        except ValueError:
-            current = None
-        step = next((s for s in current.steps if s.id == agent_id), None) if current else None
-        known = agent_id in FIXED_TOOLS or bool(instruction) or project.path(f"agents/{agent_id}").is_dir()
-        if step is None and not known:
+        view = agent_view(session.project, SessionState.fold(session.bus.replay()), agent_id)
+        if view is None:
             raise HTTPException(404, f"unknown agent {agent_id!r}")
-        state = SessionState.fold(session.bus.replay())
-        default_model = project.settings()["model"]["default"]
-        if step is None:
-            return {"id": agent_id, "status": state.steps.get(agent_id, {}).get("status", "n/a"), "skill": None,
-                    "inputs": [], "outputs": [], "tools": FIXED_TOOLS.get(agent_id, []), "model": default_model,
-                    "attempts": 0, "instruction": instruction, "summary": "", "last_failure": ""}
-        skill = discover(project).get(step.skill)
-        tools = sorted(skill.allowed_tools) if skill and skill.allowed_tools else []
-        return {"id": step.id, "status": step.status, "skill": step.skill, "inputs": step.inputs,
-                "outputs": step.outputs, "tools": tools, "model": step.model or (skill.model_hint if skill else None)
-                or default_model, "attempts": step.attempts, "instruction": instruction, "summary": step.summary,
-                "last_failure": step.last_failure}
+        return view
 
     # ── files ────────────────────────────────────────────────
     @app.get("/projects/{p}/files/{path:path}")

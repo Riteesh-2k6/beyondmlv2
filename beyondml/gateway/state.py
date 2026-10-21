@@ -4,10 +4,13 @@ from __future__ import annotations
 from dataclasses import asdict, dataclass, field
 from typing import Iterable
 
+from beyondml.harness.lead import LEAD_TOOLS
+from beyondml.harness.skills import discover
 from beyondml.workspace.plan import load_plan
 from beyondml.workspace.project import Project
 
 CHAT_AGENTS = ("user", "lead")
+FIXED_TOOLS = {"intake": [], "planner": ["submit_plan"], "lead": sorted(LEAD_TOOLS), "executor": [], "gateway": []}
 
 
 @dataclass
@@ -95,3 +98,27 @@ def plan_view(project: Project, state: SessionState) -> dict | None:
         step["metric"] = key_metric(metrics.get(step["id"], {}), plan.metric)
     view["default_model"] = project.settings()["model"]["default"]
     return view
+
+
+def agent_view(project: Project, state: SessionState, agent_id: str) -> dict | None:
+    """What the agent screen shows above the tabs. None for an agent nobody has heard of."""
+    instruction = project.read(f"agents/{agent_id}/instruction.md")
+    try:
+        plan = load_plan(project)
+    except ValueError:
+        plan = None
+    step = next((s for s in plan.steps if s.id == agent_id), None) if plan else None
+    known = agent_id in FIXED_TOOLS or bool(instruction) or project.path(f"agents/{agent_id}").is_dir()
+    if step is None and not known:
+        return None
+    default_model = project.settings()["model"]["default"]
+    if step is None:
+        return {"id": agent_id, "status": state.steps.get(agent_id, {}).get("status", "n/a"), "skill": None,
+                "goal": "", "inputs": [], "outputs": [], "tools": FIXED_TOOLS.get(agent_id, []),
+                "model": default_model, "attempts": 0, "instruction": instruction, "summary": "", "last_failure": ""}
+    skill = discover(project).get(step.skill)
+    tools = sorted(skill.allowed_tools) if skill and skill.allowed_tools else []
+    model = step.model or (skill.model_hint if skill else None) or default_model
+    return {"id": step.id, "status": step.status, "skill": step.skill, "goal": step.goal, "inputs": step.inputs,
+            "outputs": step.outputs, "tools": tools, "model": model, "attempts": step.attempts,
+            "instruction": instruction, "summary": step.summary, "last_failure": step.last_failure}
