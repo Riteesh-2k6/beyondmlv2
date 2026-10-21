@@ -2,7 +2,7 @@
 BeyondML CLI — entry point for the terminal-native AutoML platform.
 
 Usage:
-    beyondml                          Launch the interactive TUI (legacy, until the new TUI lands)
+    beyondml [--project DIR]          Open the TUI on a project, with the gateway in-process
     beyondml init [DIR] --goal TEXT   Create a BeyondML project folder
     beyondml run [GOAL] --data PATH   Plan and build an ML project headless, printing every agent event
     beyondml serve                    Run the gateway headless (REST, SSE, web UI)
@@ -19,31 +19,57 @@ from pathlib import Path
 import click
 
 
-def _launch_tui():
-    # Ensure the project root is on sys.path so tui_app.py can import beyondml
-    project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    if project_root not in sys.path:
-        sys.path.insert(0, project_root)
+TUI_OPTIONS = [
+    click.option("--project", "project_dir", default=".", show_default=True, type=click.Path(file_okay=False)),
+    click.option("--port", default=7777, show_default=True, help="Gateway port for the web UI."),
+    click.option("--no-serve", is_flag=True, default=False, help="Do not start the gateway alongside the TUI."),
+    click.option("--mode", type=click.Choice(["ask", "auto", "autonomous"]), default=None),
+    click.option("--model", default=None, help="Model for every agent, e.g. ollama_chat/qwen2.5:14b."),
+]
 
-    # Import here to avoid heavy imports on --help
-    from tui_app import BeyondMLApp
 
-    BeyondMLApp().run()
+def tui_options(f):
+    for option in reversed(TUI_OPTIONS):
+        f = option(f)
+    return f
+
+
+def _launch_tui(project_dir, port, no_serve, mode, model):
+    from beyondml.tui.app import BeyondMLApp
+
+    session = _open_session(project_dir, mode=mode, model=model)
+    server = url = None
+    if not no_serve:
+        from beyondml.gateway.app import create_app
+        from beyondml.gateway.serve import BackgroundServer
+
+        try:
+            server = BackgroundServer(create_app({session.name: session}), port=port).start()
+            url = server.url
+        except RuntimeError as e:
+            click.echo(f"gateway not started ({e}); the TUI runs alone", err=True)
+    try:
+        BeyondMLApp(session, gateway_url=url).run()
+    finally:
+        if server:
+            server.stop()
 
 
 @click.group(invoke_without_command=True)
 @click.version_option(version="0.1.0", prog_name="beyondml")
+@tui_options
 @click.pass_context
-def main(ctx):
-    """BeyondML — AI Agent Orchestration Platform for AutoML."""
+def main(ctx, project_dir, port, no_serve, mode, model):
+    """BeyondML: an ML-engineering agent harness. With no command, opens the TUI on the current project."""
     if ctx.invoked_subcommand is None:
-        _launch_tui()
+        _launch_tui(project_dir, port, no_serve, mode, model)
 
 
 @main.command()
-def tui():
-    """Launch the interactive TUI application."""
-    _launch_tui()
+@tui_options
+def tui(project_dir, port, no_serve, mode, model):
+    """Open the interactive TUI (the same as running beyondml with no command)."""
+    _launch_tui(project_dir, port, no_serve, mode, model)
 
 
 @main.command()

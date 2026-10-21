@@ -154,3 +154,52 @@ async def test_agent_screen_tabs(tmp_path):
         await until(pilot, lambda: "generation 3" in view.evolve_text)
         assert "0.82" in view.evolve_text and "n_estimators  103" in view.evolve_text
         assert "fitness per generation" in view.evolve_text and "diversity" in view.evolve_text
+
+
+async def test_experiments_table_newest_first_and_live(tmp_path):
+    session = with_plan(tmp_path)
+    project = session.project
+    project.ledger_append({"run_id": "1", "agent": "prepare", "script": "src/prepare.py", "args": [], "exit_code": 0,
+                           "timed_out": False, "seconds": 1.2, "metrics": {}})
+    project.ledger_append({"run_id": "2", "agent": "train", "script": "src/train.py", "args": ["--fast"],
+                           "exit_code": 0, "timed_out": False, "seconds": 3.4, "metrics": {"accuracy": 0.9123}})
+    app = BeyondMLApp(session)
+    async with app.run_test(size=SIZE) as pilot:
+        await pilot.press("3")
+        view = app.query_one("#experiments")
+        await until(pilot, lambda: len(view.rows) == 2)
+        assert view.rows[0][1:] == ["train", "src/train.py --fast", "0", "3.4", "accuracy=0.9123"]
+        project.ledger_append({"run_id": "3", "agent": "train", "script": "src/train.py", "args": [], "exit_code": 1,
+                               "timed_out": True, "seconds": 600.0, "metrics": {}})
+        session.bus.emit("train", "tool_result", {"id": "x", "name": "run_python", "response": {"ok": False}})
+        await until(pilot, lambda: len(view.rows) == 3)
+        assert view.rows[0][3] == "timeout"
+
+
+async def test_files_tree_hides_internals_and_previews(tmp_path):
+    session = with_plan(tmp_path)
+    (tmp_path / "src/a.py").write_bytes(b"x = 1\n")
+    (tmp_path / "data/processed/t.csv").write_bytes(b"a,b\n1,2\n3,4\n")
+    app = BeyondMLApp(session)
+    async with app.run_test(size=SIZE) as pilot:
+        await pilot.press("4")
+        view = app.query_one("#files")
+        await until(pilot, lambda: view.tree.root.children)
+        names = {str(c.label) for c in view.tree.root.children}
+        assert "src" in names and ".git" not in names and ".beyondml" not in names
+        view.preview(tmp_path / "src/a.py")
+        assert "x = 1" in view.preview_text
+        view.preview(tmp_path / "data/processed/t.csv")
+        assert view.preview_title == "data/processed/t.csv" and "3,4" in view.preview_text
+        view.preview(tmp_path.parent)  # outside the project: refused, nothing crashes
+        assert "x = 1" not in view.preview_text
+
+
+def test_cli_no_command_outside_project(tmp_path):
+    from click.testing import CliRunner
+    from beyondml.cli import main
+
+    result = CliRunner().invoke(main, ["--project", str(tmp_path)])
+    assert result.exit_code == 2 and "beyondml init" in result.output
+    assert "tui" in main.commands
+    assert "--no-serve" in CliRunner().invoke(main, ["tui", "--help"]).output

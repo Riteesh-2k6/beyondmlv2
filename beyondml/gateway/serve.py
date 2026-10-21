@@ -38,8 +38,8 @@ class BackgroundServer:
             if self.server.started or self.error or not self.thread.is_alive():
                 break
             deadline.wait(0.02)
-        if self.error:
-            raise RuntimeError(f"gateway failed to start: {self.error}")
+        if self.error or not self.server.started:
+            raise RuntimeError(f"gateway failed to start: {self.error or f'port {self.port} is probably in use'}")
         return self
 
     @property
