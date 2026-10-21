@@ -46,6 +46,7 @@ dev = [
     "pytest-asyncio>=0.21",
     "coverage>=7.0",
 ]
+optuna = ["optuna>=4.0", "cmaes>=0.10"]
 
 [project.scripts]
 beyondml = "beyondml.cli:main"

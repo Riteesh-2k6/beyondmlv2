@@ -65,3 +65,31 @@ async def test_dl_agent_tabular_run(classification_df):
     assert "test_score" in result
     assert result["model_type"] == "SimpleMLP"
     assert result["test_score"] >= 0
+
+
+async def test_ga_trainer_top_genomes_keep_rung_order(monkeypatch, classification_df, classification_profile):
+    """A screening score (rung 0) is not comparable to a full-ladder score: the ensemble's top-N must keep the
+    adapter's rung-aware order rather than re-sort by raw fitness."""
+    from beyondml.agents import ga_trainer as mod
+    from beyondml.engine.genetic import Genome
+
+    pop = [Genome("RandomForest", {}, [1] * 5, 0.60, {"mu_cv": 0.6}, rung=1),
+           Genome("LogisticRegression", {}, [1] * 5, 0.90, {"mu_cv": 0.9}, rung=0)]
+
+    class Fake:
+        def __init__(self, *a, **kw):
+            self.population = []
+
+        def evolve(self):
+            self.population = list(pop)
+            return [{"gen": 1, "best_fitness": 0.6, "avg_fitness": 0.75, "best_model": "RandomForest",
+                     "num_features": 5, "best_hparams": {}}], pop[0]
+
+    monkeypatch.setattr(mod, "GeneticModelOptimizer", Fake)
+
+    async def log(msg): pass
+    async def ask(prompt): return ""
+
+    res = await mod.GATrainerAgent(None).run(classification_df, "target", classification_profile, "RandomForest",
+                                             log, ask, pop_size=2, generations=1)
+    assert [g.rung for g in res["top_genomes"]] == [1, 0]

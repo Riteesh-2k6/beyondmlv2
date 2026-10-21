@@ -1,7 +1,8 @@
 # [TICKET-L06] GA: adaptive CV folds + n_estimators cap + fitness cache
 parent: MAP-002
 labels: wayfinder:task
-status: open
+status: superseded
+superseded-by: evolution engine v2 (docs/superpowers/specs/2026-10-19-beyondml-ml-harness-design.md, section 7)
 blocked-by: TICKET-L01
 
 ## Implementation detail for TICKET-L01

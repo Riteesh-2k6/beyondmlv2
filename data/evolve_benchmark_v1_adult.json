@@ -1,0 +1,11 @@
+{
+  "engine": "v1",
+  "cpu_count": 16,
+  "speed": null,
+  "quality": null,
+  "adult": {
+    "seconds": 189.684,
+    "time_to_best_s": 142.194,
+    "best_mu_cv": 0.859261
+  }
+}
