@@ -1,16 +1,13 @@
 """Plan board: one card per step, and the dependency graph as topological layers."""
 from __future__ import annotations
 
-import json
-
-from rich.console import Group
 from rich.text import Text
 from textual.app import ComposeResult
 from textual.containers import Horizontal, Vertical, VerticalScroll
 from textual.message import Message
 from textual.widgets import Input, Static
 
-from beyondml.gateway.state import SessionState, plan_view
+from beyondml.gateway.state import plan_view
 from beyondml.tui.theme import DIM, MUTED, STATUS_COLOR, STATUS_GLYPH, elapsed, fmt_num, status_text
 
 

@@ -47,7 +47,7 @@ def live_line(ev: dict) -> Text | None:
         return Text(f"gen {d.get('gen')}  best {fmt_num(d.get('best_fitness'))}  mean {fmt_num(d.get('mean_fitness'))}"
                     f"  diversity {fmt_num(d.get('diversity'))}", style=DIM)
     if kind == "trial":
-        return Text(f"trial {d.get('trial')}  value {fmt_num(d.get('value'))}  best {fmt_num(d.get('best_value'))}", style=DIM)
+        return Text(f"trial {d.get('number')}  {str(d.get('state', '')).lower()}  value {fmt_num(d.get('value'))}", style=DIM)
     if kind == "budget":
         return Text.assemble(("$ ", "#EAB308"), f"budget: {d.get('reason')}")
     if kind == "error":
@@ -143,7 +143,7 @@ class AgentView(Vertical):
         parts += [Text.assemble(f"  {k}  ", (fmt_num(v), "bold")) for k, v in metrics.items()] or [Text("  none yet", style=DIM)]
         parts += [Text(""), Text(f"charts ({len(charts)})", style=MUTED)]
         for c in charts:
-            parts += [Text(""), chart_event(c, width=self._width)]
+            parts += [Text(""), chart_event(c, width=self._width, project=self.app.session.project)]
         body = Text("\n").join(parts)
         self.outputs_text = body.plain
         self.query_one("#outputs-body", Static).update(body)
@@ -175,15 +175,27 @@ class AgentView(Vertical):
             best = last.get("best_params") or {}
             parts += [Text.assemble(f"  {k}  ", (fmt_num(v), "bold")) for k, v in best.items()] or [Text("  —", style=DIM)]
         if trials:
-            last = trials[-1]
-            parts.append(Text.assemble((f"trial {last.get('trial')}", "bold"), ("   best ", DIM),
-                                       (fmt_num(last.get("best_value")), "bold #F97316")))
-            x = [t.get("trial", n + 1) for n, t in enumerate(trials)]
-            parts.append(line_chart("objective per trial", x, {"value": [t.get("value") for t in trials],
-                                                              "best": [t.get("best_value") for t in trials]},
-                                    width=self._width, xlabel="trial"))
-            parts.append(Text("best params", style=MUTED))
-            parts += [Text.assemble(f"  {k}  ", (fmt_num(v), "bold")) for k, v in (last.get("params") or {}).items()]
+            complete = [t for t in trials if t.get("state") == "COMPLETE" and isinstance(t.get("value"), (int, float))]
+            best = max(complete, key=lambda t: t["value"], default=None)
+            pruned = sum(1 for t in trials if t.get("state") == "PRUNED")
+            parts.append(Text.assemble((f"trials {len(trials)}", "bold"), ("   complete ", DIM), str(len(complete)),
+                                       ("   pruned ", DIM), str(pruned), ("   max value ", DIM),
+                                       (f"{fmt_num(best['value'])} (trial {best.get('number')})" if best else "—",
+                                        "bold #F97316")))
+            if complete:
+                running, peak = [], float("-inf")
+                for t in complete:
+                    peak = max(peak, t["value"])
+                    running.append(peak)
+                x = [t.get("number", n + 1) for n, t in enumerate(complete)]
+                parts.append(line_chart("objective per trial (complete)", x,
+                                        {"value": [t["value"] for t in complete], "running max": running},
+                                        width=self._width, xlabel="trial",
+                                        colors={"value": MEAN, "running max": PALETTE[0]}))
+            shown = best or trials[-1]
+            parts.append(Text(f"parameters of trial {shown.get('number')}" + (" (max value)" if best else ""), style=MUTED))
+            parts += [Text.assemble(f"  {k}  ", (fmt_num(v), "bold")) for k, v in (shown.get("params") or {}).items()] \
+                or [Text("  —", style=DIM)]
         body = Text("\n").join(parts)
         self.evolve_text = body.plain
         self.query_one("#evolve-body", Static).update(body)

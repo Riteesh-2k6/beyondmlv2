@@ -1,7 +1,7 @@
 // The evolve step's own view: best and mean fitness per generation, diversity, the best genome.
 import type { Data } from 'plotly.js'
 import { fmt, type Generation, type Trial } from '../session'
-import { Plot, SERIES } from './Plot'
+import { NEUTRAL_FILL, Plot, SERIES } from './Plot'
 
 function ParamTable({ params }: { params: Record<string, unknown> }) {
   const rows = Object.entries(params)
@@ -49,11 +49,11 @@ export function EvolveView({ generations, trials }: { generations: Generation[];
               { x: generations.map((g) => g.gen), y: generations.map((g) => g.best_fitness), name: 'best', type: 'scatter', mode: 'lines+markers', line: { color: SERIES[0], width: 2 }, marker: { size: 5 } },
               { x: generations.map((g) => g.gen), y: generations.map((g) => g.mean_fitness), name: 'mean', type: 'scatter', mode: 'lines+markers', line: { color: '#71717A', width: 1.5 }, marker: { size: 4 } },
             ] as Data[]}
-            layout={{ title: { text: 'fitness per generation', font: { size: 12, color: '#E4E4E7' }, x: 0 }, xaxis: { title: { text: 'generation' }, dtick: 1 } }}
+            layout={{ title: { text: 'fitness per generation', font: { size: 12, color: '#E4E4E7' }, x: 0 }, xaxis: { title: { text: 'generation', standoff: 8 }, dtick: 1 } }}
           />
           <Plot
             height={160}
-            data={[{ x: generations.map((g) => g.gen), y: generations.map((g) => g.diversity), type: 'bar', marker: { color: 'rgba(34,211,238,0.45)', line: { color: SERIES[1], width: 1 } }, name: 'diversity' }] as Data[]}
+            data={[{ x: generations.map((g) => g.gen), y: generations.map((g) => g.diversity), type: 'bar', marker: { color: NEUTRAL_FILL, line: { color: SERIES[1], width: 1 } }, name: 'diversity' }] as Data[]}
             layout={{ title: { text: 'population diversity', font: { size: 12, color: '#E4E4E7' }, x: 0 }, xaxis: { dtick: 1 }, yaxis: { range: [0, 1.05] }, showlegend: false }}
           />
           <div>
@@ -79,10 +79,10 @@ export function EvolveView({ generations, trials }: { generations: Generation[];
               height={260}
               data={[
                 { x: complete.map((t) => t.number), y: complete.map((t) => t.value), name: 'complete', type: 'scatter', mode: 'markers', marker: { color: SERIES[1], size: 5 } },
-                { x: trials.filter((t) => t.state !== 'COMPLETE').map((t) => t.number), y: trials.filter((t) => t.state !== 'COMPLETE').map((t) => t.value), name: 'pruned / failed', type: 'scatter', mode: 'markers', marker: { color: '#71717A', size: 4, symbol: 'x' } },
+                { x: trials.filter((t) => t.state !== 'COMPLETE').map((t) => t.number), y: trials.filter((t) => t.state !== 'COMPLETE').map((t) => t.value), name: 'pruned / failed', type: 'scatter', mode: 'markers', marker: { color: SERIES[2], size: 4, symbol: 'x' } },
                 { x: trials.map((t) => t.number), y: running.map((v) => (Number.isFinite(v) ? v : null)), name: 'running max', type: 'scatter', mode: 'lines', line: { color: SERIES[0], width: 1.5, dash: 'dot' } },
               ] as Data[]}
-              layout={{ title: { text: 'objective per trial', font: { size: 12, color: '#E4E4E7' }, x: 0 }, xaxis: { title: { text: 'trial' } } }}
+              layout={{ title: { text: 'objective per trial', font: { size: 12, color: '#E4E4E7' }, x: 0 }, xaxis: { title: { text: 'trial', standoff: 8 }, dtick: trials.length <= 20 ? 1 : undefined } }}
             />
             <div>
               <h3 className="mb-2 text-xs font-medium text-fg">{best ? `parameters of trial ${best.number} (max value)` : `parameters of trial ${lastTrial.number}`}</h3>

@@ -64,7 +64,7 @@ export function ChatDock({ project, messages, pendingCount, onOpenPrompts, input
         </button>
         {busy && <span className="text-xs text-orange">thinking…</span>}
         {pendingCount > 0 && (
-          <button type="button" onClick={onOpenPrompts} className="text-xs text-warn hover:underline">
+          <button type="button" onClick={onOpenPrompts} className="text-xs text-orange hover:underline">
             {pendingCount} prompt{pendingCount > 1 ? 's' : ''} waiting for you
           </button>
         )}
@@ -83,7 +83,7 @@ export function ChatDock({ project, messages, pendingCount, onOpenPrompts, input
             )}
             {messages.map((m, i) => (
               <div key={`${m.ts}-${i}`} className="flex gap-2 py-0.5 leading-5">
-                <span className={clsx('w-9 shrink-0 font-mono text-xs leading-5', m.agent === 'user' ? 'text-info' : 'text-orange')}>
+                <span className={clsx('w-9 shrink-0 font-mono text-xs leading-5', m.agent === 'user' ? 'text-muted' : 'text-orange')}>
                   {m.agent === 'user' ? 'you' : 'lead'}
                 </span>
                 <p className="min-w-0 whitespace-pre-wrap break-words text-fg/90">{m.text}</p>

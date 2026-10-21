@@ -203,3 +203,44 @@ def test_cli_no_command_outside_project(tmp_path):
     assert result.exit_code == 2 and "beyondml init" in result.output
     assert "tui" in main.commands
     assert "--no-serve" in CliRunner().invoke(main, ["tui", "--help"]).output
+
+
+async def test_question_with_options_is_picked_by_digit(tmp_path):
+    import asyncio
+
+    session = with_plan(tmp_path)
+    session.bus.emit("train", "question", {"question": "which model?", "options": ["rf", "xgb"], "recommended": "xgb"})
+    asked = asyncio.ensure_future(session._ask("which model?"))
+    app = BeyondMLApp(session)
+    async with app.run_test(size=SIZE) as pilot:
+        await until(pilot, lambda: isinstance(app.screen, ApprovalModal))
+        body = str(app.screen.query_one("#prompt-body").render())
+        assert "1  rf" in body and "2  xgb" in body and "recommended" in body
+        assert not isinstance(app.focused, Input)  # digits must reach the modal, not an input
+        await pilot.press("2")
+        await until(pilot, lambda: asked.done())
+        assert asked.result() == "xgb"
+
+
+async def test_agent_tune_and_figure_file(tmp_path):
+    import json
+
+    session = with_plan(tmp_path)
+    bus = session.bus
+    for n, (v, state) in enumerate([(0.71, "COMPLETE"), (None, "PRUNED"), (0.78, "COMPLETE"), (0.74, "COMPLETE")], start=1):
+        bus.emit("train", "trial", {"number": n, "value": v, "params": {"lr": 0.1 * n}, "state": state})
+    session.project.write("reports/charts/folds.json", json.dumps({
+        "data": [{"type": "scatter", "mode": "lines", "name": "valid", "x": [1, 2, 3], "y": [0.8, 0.79, 0.82]},
+                 {"type": "bar", "name": "missing", "x": ["age", "fare"], "y": [19.9, 0.1]}],
+        "layout": {"xaxis": {"title": {"text": "fold"}}}}))
+    bus.emit("train", "chart", {"title": "accuracy by fold", "path": "reports/charts/folds.json"})
+    bus.emit("train", "chart", {"title": "ghost", "path": "reports/charts/missing.json"})
+    app = BeyondMLApp(session)
+    async with app.run_test(size=SIZE) as pilot:
+        app.open_agent("train")
+        await until(pilot, lambda: app.agent_view.info is not None)
+        view = app.agent_view
+        assert "trials 4" in view.evolve_text and "complete 3" in view.evolve_text and "pruned 1" in view.evolve_text
+        assert "max value 0.78 (trial 3)" in view.evolve_text and "lr  0.3" in view.evolve_text
+        assert "accuracy by fold" in view.outputs_text and "fold" in view.outputs_text
+        assert "ghost: reports/charts/missing.json could not be read" in view.outputs_text

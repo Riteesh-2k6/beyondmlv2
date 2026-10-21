@@ -24,6 +24,11 @@ function inline(chart: ChartData): Data[] {
   })
 }
 
+/** Fold indices, generations, trials: whole numbers get whole-number ticks. */
+function integerAxis(xs: unknown[]): boolean {
+  return xs.length > 0 && xs.length <= 30 && xs.every((v) => typeof v === 'number' && Number.isInteger(v))
+}
+
 /** Traces keep their own colours when the file sets them; unset ones take the palette in order. */
 function recolour(data: Data[]): Data[] {
   return data.map((trace, i) => {
@@ -63,10 +68,14 @@ export function ChartEvent({ chart }: { chart: ChartData }) {
     if (error) return <p className="text-xs text-danger">{chart.title}: {chart.path} could not be read ({error})</p>
     if (!figure) return <div className="skeleton" style={{ height: 240 }} aria-busy="true" />
     const { height: _h, width: _w, template: _t, paper_bgcolor: _p, plot_bgcolor: _b, ...layout } = (figure.layout ?? {}) as Record<string, unknown>
-    return <Plot data={recolour(figure.data)} height={260} layout={{ ...(layout as Partial<Layout>), title }} />
+    const xs = figure.data.flatMap((t) => ((t as { x?: unknown[] }).x ?? []))
+    return <Plot data={recolour(figure.data)} height={260} layout={{ ...(layout as Partial<Layout>), title, ...(integerAxis(xs) ? { xaxis: { ...((layout as Partial<Layout>).xaxis ?? {}), dtick: 1 } } : {}) }} />
   }
   if (!chart.x?.length || !chart.series || !Object.keys(chart.series).length) {
     return <p className="text-xs text-muted">{chart.title}: nothing to plot</p>
   }
-  return <Plot data={inline(chart)} height={240} layout={{ title, showlegend: Object.keys(chart.series).length > 1 }} />
+  return (
+    <Plot data={inline(chart)} height={240}
+      layout={{ title, showlegend: Object.keys(chart.series).length > 1, ...(integerAxis(chart.x) ? { xaxis: { dtick: 1 } } : {}) }} />
+  )
 }

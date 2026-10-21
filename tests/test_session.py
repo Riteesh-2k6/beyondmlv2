@@ -148,3 +148,17 @@ def test_fold_pending_resolved_and_series():
     for e in events:
         inc.apply(e)
     assert json.dumps(inc.to_dict(), sort_keys=True) == json.dumps(state.to_dict(), sort_keys=True)
+
+
+async def test_question_copies_options_from_the_tool_event(tmp_path):
+    session = Session(tmp_path, goal="g")
+    session.bind()
+    # ask_user emits the id-less question first, then calls the asker with only the text
+    session.bus.emit("a", "question", {"question": "which model?", "options": ["rf", "xgb"], "recommended": "xgb"})
+    task = asyncio.create_task(session._ask("which model?"))
+    await wait_for(lambda: session.pending)
+    pid, entry = first_pending(session)
+    assert entry["agent"] == "a" and entry["data"]["options"] == ["rf", "xgb"] and entry["data"]["recommended"] == "xgb"
+    assert session.summary()["pending"][0]["options"] == ["rf", "xgb"]
+    await session.answer(pid, "xgb")
+    assert await task == "xgb"

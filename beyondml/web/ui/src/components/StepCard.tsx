@@ -20,7 +20,6 @@ export function StepCard({ step, defaultModel, now, onOpen, active }: {
         'group block w-full border-b border-border-sub px-3 py-2 text-left transition-colors duration-150',
         'hover:bg-surface focus-visible:bg-surface',
         active && 'bg-surface',
-        running && 'card-running',
       )}
       aria-label={`${step.id}: ${step.status}`}
     >
@@ -28,7 +27,7 @@ export function StepCard({ step, defaultModel, now, onOpen, active }: {
         <StatusMark status={step.status} size={12} />
         <span className="font-mono text-sm font-medium text-fg">{step.id}</span>
         <span className="truncate text-xs text-muted">{step.skill}</span>
-        {step.attempts > 1 && <Chip tone="warn">attempt {step.attempts}</Chip>}
+        {step.attempts > 1 && <Chip tone="muted">attempt {step.attempts}</Chip>}
         <span className="ml-auto flex shrink-0 items-center gap-3 font-mono text-xs tabular-nums">
           {step.metric && (
             <span>
@@ -53,7 +52,7 @@ export function StepCard({ step, defaultModel, now, onOpen, active }: {
           ) : step.status === 'done' && step.summary ? (
             <span className="min-w-0 truncate text-xs text-muted">{step.summary}</span>
           ) : step.status === 'pending' && step.last_failure ? (
-            <span className="min-w-0 truncate text-xs text-warn">retrying: {step.last_failure}</span>
+            <span className="min-w-0 truncate text-xs text-orange">retrying: {step.last_failure}</span>
           ) : null}
         </div>
       )}

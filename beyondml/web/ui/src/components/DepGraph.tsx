@@ -56,9 +56,8 @@ export function DepGraph({ steps, onOpen, active }: { steps: Step[]; onOpen: (id
   return (
     <svg
       viewBox={`0 0 ${width} ${height}`}
-      width={width}
-      height={height}
-      className="h-auto max-w-full"
+      width="100%"
+      style={{ maxWidth: width * 1.6, height: 'auto' }} // fills the panel, never balloons past 1.6x
       preserveAspectRatio="xMinYMin meet"
       role="img"
       aria-label="dependency graph"

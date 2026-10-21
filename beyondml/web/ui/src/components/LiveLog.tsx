@@ -9,6 +9,14 @@ function isFailure(resp: unknown): resp is Record<string, unknown> {
   return !!resp && typeof resp === 'object' && ((resp as Record<string, unknown>).ok === false || 'error' in (resp as object))
 }
 
+function Chevron() {
+  return (
+    <svg width="8" height="8" viewBox="0 0 8 8" className="chev mr-1 inline-block text-muted transition-transform duration-150" aria-hidden="true">
+      <path d="M2.5 1.5 L5.5 4 L2.5 6.5" fill="none" stroke="currentColor" strokeWidth="1.5" />
+    </svg>
+  )
+}
+
 function Row({ ev }: { ev: BusEvent }) {
   const d = ev.data
   const time = <span className="w-16 shrink-0 font-mono text-2xs text-muted tabular-nums">{timeOf(ev.ts)}</span>
@@ -23,7 +31,7 @@ function Row({ ev }: { ev: BusEvent }) {
           {time}
           <details className="min-w-0 flex-1 font-mono text-xs">
             <summary className="cursor-pointer list-none text-orange">
-              <span className="text-orange">→ </span>{String(d.name)}
+              <Chevron />{String(d.name)}
               <span className="text-muted">({JSON.stringify(d.args ?? {}).slice(0, 140)})</span>
             </summary>
             <pre className="mt-1 max-h-72 overflow-auto whitespace-pre-wrap break-words border border-border-sub bg-obsidian p-2 text-muted">
@@ -40,7 +48,7 @@ function Row({ ev }: { ev: BusEvent }) {
           {time}
           <details className="min-w-0 flex-1 font-mono text-xs">
             <summary className={clsx('cursor-pointer list-none', failed ? 'text-danger' : 'text-success')}>
-              ← {String(d.name)}{failed ? <span className="text-muted">  {detail.slice(0, 160)}</span> : <span className="text-muted">  ok</span>}
+              <Chevron />{String(d.name)}{failed ? <span className="text-muted">  {detail.slice(0, 160)}</span> : <span className="text-muted">  ok</span>}
             </summary>
             <pre className="mt-1 max-h-72 overflow-auto whitespace-pre-wrap break-words border border-border-sub bg-obsidian p-2 text-muted">
               {JSON.stringify(d.response ?? null, null, 2)}
@@ -56,12 +64,12 @@ function Row({ ev }: { ev: BusEvent }) {
     case 'question':
       if (!('id' in d)) return null
       return (
-        <div className="flex gap-2 py-0.5">{time}<p className="text-sm"><span className="text-warn">? </span>{String(d.question)}{'answer' in d && <span className="text-success"> → {String(d.answer)}</span>}</p></div>
+        <div className="flex gap-2 py-0.5">{time}<p className="text-sm"><span className="text-orange">? </span>{String(d.question)}{'answer' in d && <span className="text-success"> → {String(d.answer)}</span>}</p></div>
       )
     case 'approval_request':
       if (!('id' in d)) return null
       return (
-        <div className="flex gap-2 py-0.5">{time}<p className="text-sm"><span className="text-warn">! </span>approval: {String(d.tool ?? d.kind)}
+        <div className="flex gap-2 py-0.5">{time}<p className="text-sm"><span className="text-orange">! </span>approval: {String(d.tool ?? d.kind)}
           {'answer' in d && <span className={d.answer ? 'text-success' : 'text-danger'}> → {d.answer ? 'approved' : 'denied'}</span>}</p></div>
       )
     case 'generation':
@@ -77,7 +85,7 @@ function Row({ ev }: { ev: BusEvent }) {
     case 'chart':
       return <div className="flex gap-2 py-0.5 font-mono text-xs text-muted">{time}<span>chart: {String(d.title)}{d.path ? ` (${String(d.path)})` : ''}</span></div>
     case 'budget':
-      return <div className="flex gap-2 py-0.5 text-sm">{time}<span className="text-warn">budget: {String(d.reason)}</span></div>
+      return <div className="flex gap-2 py-0.5 text-sm">{time}<span className="text-orange">budget: {String(d.reason)}</span></div>
     case 'error':
       return <div className="flex gap-2 py-0.5 text-sm">{time}<span className="text-danger">{String(d.code)}: {String(d.message)}</span></div>
     default:

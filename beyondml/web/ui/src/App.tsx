@@ -70,7 +70,7 @@ function Shell() {
           <NavLink to="/" className="hidden text-sm font-medium text-orange hover:text-orange/80 sm:block" title="all projects">BeyondML</NavLink>
           <span className="shrink-0 whitespace-nowrap font-mono text-sm text-fg">{name}</span>
           {summary?.goal && <span className="hidden min-w-0 truncate text-sm text-muted md:block" style={{ maxWidth: '28rem' }}>{summary.goal}</span>}
-          <nav aria-label="screens" className="flex min-w-0 items-center gap-0.5 overflow-x-auto sm:ml-2">
+          <nav aria-label="screens" className="no-scrollbar flex min-w-0 items-center gap-0.5 overflow-x-auto sm:ml-2">
             {NAV.map((n) => (
               <NavLink
                 key={n.to}
@@ -90,7 +90,7 @@ function Shell() {
               <span className={summary?.running ? 'text-orange' : 'text-muted'}>{summary?.running ? 'running' : connected ? 'idle' : 'reconnecting'}</span>
             </span>
             {pending.length > 0 && (
-              <button type="button" onClick={() => setPromptOpen(true)} className="flex h-7 items-center gap-1.5 rounded-[2px] border border-warn/60 px-2 text-xs text-warn hover:bg-warn/10">
+              <button type="button" onClick={() => setPromptOpen(true)} className="flex h-7 items-center gap-1.5 rounded-[2px] border border-orange/60 px-2 text-xs text-orange hover:bg-orange/10">
                 {pending.length} waiting <Key>a</Key>
               </button>
             )}

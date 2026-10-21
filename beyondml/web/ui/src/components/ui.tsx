@@ -48,22 +48,22 @@ export function StatusMark({ status, size = 12, className }: { status: Status | 
 }
 
 export function StatusWord({ status }: { status: string }) {
+  // the mark carries the colour; the word stays legible on every ground
   return (
-    <span className="inline-flex items-center gap-1.5 font-mono text-xs" style={{ color: STATUS_COLOR[status] }}>
+    <span className="inline-flex items-center gap-1.5 font-mono text-xs text-muted">
       <StatusMark status={status} />
       {status}
     </span>
   )
 }
 
-export function Chip({ children, tone = 'muted', className }: { children: ReactNode; tone?: 'muted' | 'accent' | 'warn' | 'danger'; className?: string }) {
+export function Chip({ children, tone = 'muted', className }: { children: ReactNode; tone?: 'muted' | 'accent' | 'danger'; className?: string }) {
   return (
     <span
       className={clsx(
         'inline-flex items-center rounded-[2px] border px-1.5 py-px font-mono text-2xs leading-4',
         tone === 'muted' && 'border-border-sub text-muted',
         tone === 'accent' && 'border-orange/40 text-orange',
-        tone === 'warn' && 'border-warn/50 text-warn',
         tone === 'danger' && 'border-danger/50 text-danger',
         className,
       )}

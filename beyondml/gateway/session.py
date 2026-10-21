@@ -21,13 +21,14 @@ TRUE_WORDS = {"y", "yes", "true", "1", "ok", "approve"}
 
 
 class SessionBus(EventBus):
-    """Remembers which agent asked the last question, so the parked prompt is filed under it."""
+    """Remembers the last id-less question `ask_user` emitted: its agent files the parked prompt, and its
+    options/recommended ride along (the asker callback only receives the question text)."""
 
-    last_question_agent: str | None = None
+    last_question: tuple[str, dict] | None = None
 
     def emit(self, agent: str, kind: str, data: dict) -> dict:
         if kind == "question" and "id" not in data:
-            self.last_question_agent = agent
+            self.last_question = (agent, dict(data))
         return super().emit(agent, kind, data)
 
 
@@ -101,7 +102,12 @@ class Session:
             self.pending.pop(pid, None)
 
     async def _ask(self, question: str) -> str:
-        return await self._park(self.bus.last_question_agent or "lead", "question", {"question": question})
+        agent, extra = "lead", {}
+        if self.bus.last_question:
+            agent, raw = self.bus.last_question
+            if raw.get("question") == question:
+                extra = {k: raw[k] for k in ("options", "recommended") if raw.get(k)}
+        return await self._park(agent, "question", {**extra, "question": question})
 
     async def _approve(self, payload: dict) -> bool:
         agent = payload.get("agent") or {"plan": "planner"}.get(payload.get("kind"), "executor")
