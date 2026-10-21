@@ -33,12 +33,14 @@ The core kinds are unchanged. This sub-project fixes the data shapes clients ren
 
 | Kind | Author | Data | Emitted by |
 |---|---|---|---|
-| `question` | the asking agent | `{id, question}` pending; `{id, question, answer}` resolved | Session asker (the id-less `question` from `ask_user` is ignored by clients) |
+| `question` | the asking agent | `{id, question, options?: [str], recommended?: str}` pending; `{id, ..., answer}` resolved | Session asker; options and recommended are copied from the id-less `question` that `ask_user` emits just before (sub-project 3 adds them). Clients ignore the id-less event itself |
 | `approval_request` | `payload.agent` / `planner` / `executor` | `{id, kind: tool\|plan\|budget, ...payload}` pending; same `+ answer: bool` resolved | Session approver (ADK's id-less `approval_request` is ignored by clients) |
 | `message_delta` | `user` | `{text, partial: false}` | Session chat, so the transcript replays |
 | `generation` | the evolve step | `{gen, best_fitness, mean_fitness, diversity, evals, seconds, best_params}` | sub-project 3's `evolve` tool (mirrors `GenStats`) |
-| `trial` | the tune step | `{trial, value, best_value, params, seconds}` | sub-project 3's `tune` tool |
-| `chart` | any | `{title, kind: line\|bar\|scatter, x: [...], series: {name: [...]}, path?}` | sub-project 3's `chart` tool |
+| `trial` | the tune step | `{number, value, params, state}` (state is Optuna's: COMPLETE, PRUNED, FAIL) | sub-project 3's `tune` tool; clients compute the running best |
+| `chart` | any | `{title, path}` where `path` is a Plotly figure JSON (`{data, layout}`) under `reports/charts/`; an inline `{title, kind, x, series}` is accepted as a fallback | sub-project 3's `chart` tool; the web renders the figure with Plotly, the TUI approximates its traces with plotext |
+
+Questions with non-empty `options` render as choice buttons with the recommended one marked, in both clients' approvals UI; free text stays the fallback.
 
 A **prompt** is a `question` or `approval_request` event carrying an `id`. The same `id` with an `answer` key resolves it. Pending prompts are the ids seen without a resolution; both clients fold them this way, so reconnecting shows what is still waiting.
 

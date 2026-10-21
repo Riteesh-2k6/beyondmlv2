@@ -59,6 +59,8 @@ export interface Prompt {
   id: string
   kind?: 'plan' | 'tool' | 'budget'
   question?: string
+  options?: string[]
+  recommended?: string
   tool?: string
   args?: unknown
   hint?: string | null

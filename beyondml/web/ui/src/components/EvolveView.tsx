@@ -62,27 +62,35 @@ export function EvolveView({ generations, trials }: { generations: Generation[];
           </div>
         </section>
       )}
-      {trials.length > 0 && lastTrial && (
-        <section className="space-y-3">
-          <div className="flex flex-wrap items-center gap-x-5 gap-y-1">
-            <Stat label="trial" value={String(lastTrial.trial)} />
-            <Stat label="best value" value={fmt(lastTrial.best_value)} accent />
-            <Stat label="elapsed" value={`${fmt(lastTrial.seconds)}s`} />
-          </div>
-          <Plot
-            height={260}
-            data={[
-              { x: trials.map((t) => t.trial), y: trials.map((t) => t.value), name: 'value', type: 'scatter', mode: 'markers', marker: { color: SERIES[1], size: 5 } },
-              { x: trials.map((t) => t.trial), y: trials.map((t) => t.best_value), name: 'best', type: 'scatter', mode: 'lines', line: { color: SERIES[0], width: 2 } },
-            ] as Data[]}
-            layout={{ title: { text: 'objective per trial', font: { size: 12, color: '#E4E4E7' }, x: 0 }, xaxis: { title: { text: 'trial' } } }}
-          />
-          <div>
-            <h3 className="mb-2 text-xs font-medium text-fg">best parameters</h3>
-            <ParamTable params={lastTrial.params ?? {}} />
-          </div>
-        </section>
-      )}
+      {trials.length > 0 && lastTrial && (() => {
+        const complete = trials.filter((t) => t.state === 'COMPLETE' && typeof t.value === 'number')
+        const best = complete.reduce<Trial | null>((b, t) => (b === null || (t.value as number) > (b.value as number) ? t : b), null)
+        let runningMax = -Infinity
+        const running = trials.map((t) => (typeof t.value === 'number' && t.state === 'COMPLETE' ? (runningMax = Math.max(runningMax, t.value)) : runningMax))
+        return (
+          <section className="space-y-3">
+            <div className="flex flex-wrap items-center gap-x-5 gap-y-1">
+              <Stat label="trials" value={String(trials.length)} />
+              <Stat label="complete" value={String(complete.length)} />
+              <Stat label="pruned" value={String(trials.filter((t) => t.state === 'PRUNED').length)} />
+              {best && <Stat label="max value" value={`${fmt(best.value)} (trial ${best.number})`} accent />}
+            </div>
+            <Plot
+              height={260}
+              data={[
+                { x: complete.map((t) => t.number), y: complete.map((t) => t.value), name: 'complete', type: 'scatter', mode: 'markers', marker: { color: SERIES[1], size: 5 } },
+                { x: trials.filter((t) => t.state !== 'COMPLETE').map((t) => t.number), y: trials.filter((t) => t.state !== 'COMPLETE').map((t) => t.value), name: 'pruned / failed', type: 'scatter', mode: 'markers', marker: { color: '#71717A', size: 4, symbol: 'x' } },
+                { x: trials.map((t) => t.number), y: running.map((v) => (Number.isFinite(v) ? v : null)), name: 'running max', type: 'scatter', mode: 'lines', line: { color: SERIES[0], width: 1.5, dash: 'dot' } },
+              ] as Data[]}
+              layout={{ title: { text: 'objective per trial', font: { size: 12, color: '#E4E4E7' }, x: 0 }, xaxis: { title: { text: 'trial' } } }}
+            />
+            <div>
+              <h3 className="mb-2 text-xs font-medium text-fg">{best ? `parameters of trial ${best.number} (max value)` : `parameters of trial ${lastTrial.number}`}</h3>
+              <ParamTable params={(best ?? lastTrial).params ?? {}} />
+            </div>
+          </section>
+        )
+      })()}
     </div>
   )
 }

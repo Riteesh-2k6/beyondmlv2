@@ -1,3 +1,4 @@
+import clsx from 'clsx'
 // A pending prompt, answered here: plan approval, tool approval, budget, or a free-text question.
 import { useEffect, useRef, useState, type FormEvent } from 'react'
 import type { Prompt } from '../api'
@@ -23,13 +24,20 @@ export function ApprovalModal({ prompt, count, onAnswer, onLater }: {
   useEffect(() => {
     setText('')
     setError(null)
-    if (isQuestion) input.current?.focus()
+    if (isQuestion && !(prompt.options ?? []).length) input.current?.focus() // with choices, digit keys pick; tab reaches the input
   }, [prompt.id, isQuestion])
+
+  const options = isQuestion ? (prompt.options ?? []).filter((o) => typeof o === 'string' && o.trim()) : []
 
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
       if (e.key === 'Escape') onLater()
-      if (isQuestion || busy || (e.target as HTMLElement)?.tagName === 'INPUT') return
+      if (busy || (e.target as HTMLElement)?.tagName === 'INPUT') return
+      if (isQuestion) {
+        const n = Number(e.key)
+        if (n >= 1 && n <= Math.min(options.length, 9)) void answer(options[n - 1])
+        return
+      }
       if (e.key === 'y') void answer(true)
       if (e.key === 'n') void answer(false)
     }
@@ -91,13 +99,35 @@ export function ApprovalModal({ prompt, count, onAnswer, onLater }: {
           )}
           {kind === 'budget' && <p className="text-fg/90">{prompt.reason}. Approving grants one more budget's worth.</p>}
           {isQuestion && <p className="whitespace-pre-wrap text-fg/90">{prompt.question}</p>}
+          {options.length > 0 && (
+            <ol className="mt-3 space-y-1" aria-label="choices">
+              {options.map((o, i) => {
+                const rec = o === prompt.recommended
+                return (
+                  <li key={o}>
+                    <button
+                      type="button"
+                      disabled={busy}
+                      onClick={() => void answer(o)}
+                      className={clsx('flex w-full items-center gap-2 rounded-[2px] border px-2 py-1.5 text-left text-sm transition-colors duration-150',
+                        rec ? 'border-orange/60 text-fg hover:bg-orange/10' : 'border-border-sub text-fg/90 hover:border-muted hover:bg-obsidian')}
+                    >
+                      {i < 9 && <Key>{i + 1}</Key>}
+                      <span className="min-w-0 flex-1">{o}</span>
+                      {rec && <span className="font-mono text-2xs text-orange">recommended</span>}
+                    </button>
+                  </li>
+                )
+              })}
+            </ol>
+          )}
           {error && <p className="mt-2 text-xs text-danger">{error}</p>}
         </div>
         <div className="flex items-center gap-2 border-t border-border-sub px-4 py-2.5">
           {isQuestion ? (
             <form onSubmit={submit} className="flex w-full items-center gap-2">
               <input ref={input} value={text} onChange={(e) => setText(e.target.value)} className={field}
-                placeholder="your answer" aria-label="your answer" disabled={busy} />
+                placeholder={options.length ? 'or type your own answer' : 'your answer'} aria-label="your answer" disabled={busy} />
               <Button type="submit" kind="primary" disabled={busy || !text.trim()}>Answer</Button>
               <Button onClick={onLater}>Later</Button>
             </form>

@@ -27,19 +27,18 @@ export interface Generation {
 }
 
 export interface Trial {
-  trial: number
-  value: number
-  best_value: number
+  number: number
+  value: number | null
   params: Record<string, unknown>
-  seconds: number
+  state: string // Optuna's: COMPLETE, PRUNED, FAIL
 }
 
 export interface ChartData {
   title: string
-  kind?: 'line' | 'bar' | 'scatter'
-  x: (number | string)[]
-  series: Record<string, number[]>
-  path?: string
+  path?: string // a Plotly figure JSON ({data, layout}) under reports/charts/
+  kind?: 'line' | 'bar' | 'scatter' // inline fallback
+  x?: (number | string)[]
+  series?: Record<string, number[]>
 }
 
 export interface Fold {

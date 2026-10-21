@@ -70,12 +70,12 @@ function Row({ ev }: { ev: BusEvent }) {
       )
     case 'trial':
       return (
-        <div className="flex gap-2 py-0.5 font-mono text-xs text-muted">{time}<span>trial {String(d.trial)}  value {fmt(d.value)}  best {fmt(d.best_value)}</span></div>
+        <div className="flex gap-2 py-0.5 font-mono text-xs text-muted">{time}<span>trial {String(d.number)}  {String(d.state ?? '').toLowerCase()}  value {fmt(d.value)}</span></div>
       )
     case 'artifact':
       return <div className="flex gap-2 py-0.5 font-mono text-xs text-muted">{time}<span>wrote {String(d.path)}</span></div>
     case 'chart':
-      return <div className="flex gap-2 py-0.5 font-mono text-xs text-muted">{time}<span>chart: {String(d.title)}</span></div>
+      return <div className="flex gap-2 py-0.5 font-mono text-xs text-muted">{time}<span>chart: {String(d.title)}{d.path ? ` (${String(d.path)})` : ''}</span></div>
     case 'budget':
       return <div className="flex gap-2 py-0.5 text-sm">{time}<span className="text-warn">budget: {String(d.reason)}</span></div>
     case 'error':
