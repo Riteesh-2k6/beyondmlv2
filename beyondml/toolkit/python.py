@@ -45,6 +45,8 @@ def _snapshot(root: Path, sub: str = ".") -> dict[str, tuple[int, int]]:
         top = Path(d) == root
         if top:
             dirs[:] = [x for x in dirs if x not in _SKIP_TOP]
+        elif Path(d) == root / "data":
+            dirs[:] = [x for x in dirs if x != "raw"]  # read-only input, never a step's output (and can be huge)
         for f in files:
             if top and f in _HARNESS_FILES:
                 continue

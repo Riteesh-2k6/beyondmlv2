@@ -99,6 +99,14 @@ class Plan:
                 raise ValueError(f"plan: '{k}' is missing or not a {t.__name__}")
         return cls(d["goal"], d["metric"], d["budget"], [Step.from_dict(x) for x in d["steps"]])
 
+    @classmethod
+    def from_model(cls, d: dict) -> "Plan":
+        """A plan written by a model: its runtime fields are ignored, so it can't mark work done or carry stale state."""
+        plan = cls.from_dict(d)
+        for s in plan.steps:
+            s.status, s.attempts, s.checkpoint, s.touched, s.summary, s.last_failure = "pending", 0, None, [], "", ""
+        return plan
+
     def to_dict(self) -> dict:
         return asdict(self)
 

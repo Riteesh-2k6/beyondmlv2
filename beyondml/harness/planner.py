@@ -52,7 +52,7 @@ async def _plan_loop(project: Project, bus: EventBus, skills: dict[str, SkillInf
         """Submit the full plan. Returns ok, or the errors to fix before submitting again."""
         state["calls"] += 1
         try:
-            candidate = finish(Plan.from_dict(plan))
+            candidate = finish(Plan.from_model(plan))
             errors = candidate.validate(known)
         except ValueError as e:
             errors = [str(e)]

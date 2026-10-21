@@ -12,7 +12,8 @@ import tomllib
 from pathlib import Path
 from typing import Iterable
 
-GITIGNORE = "data/raw/\ndata/processed/\n.beyondml/sessions.sqlite*\n.beyondml/runs/\n*.pkl\n*.joblib\n*.pt\n"
+GITIGNORE = ("data/raw/\ndata/processed/\n.beyondml/sessions.sqlite*\n.beyondml/runs/\n*.pkl\n*.joblib\n*.pt\n"
+             "__pycache__/\n")
 DEFAULT_SETTINGS = {
     "model": {"default": "ollama_chat/qwen2.5:14b", "api_base": "http://127.0.0.1:11434"},
     "run": {"mode": "auto", "max_tool_calls": 40, "budget_minutes": 60, "budget_usd": 2.0},
@@ -23,7 +24,9 @@ SETTINGS_TOML = (
 )
 DIRS = ["data/raw", "data/processed", "src", "models", "reports", "agents", ".beyondml/skills"]
 LEDGER = "experiments.jsonl"
-GIT_ID = ["-c", "user.name=beyondml", "-c", "user.email=beyondml@localhost"]
+# Harness commits never sign and never run the user's hooks: a global gpgsign or pre-commit hook must not break a run.
+GIT_ID = ["-c", "user.name=beyondml", "-c", "user.email=beyondml@localhost", "-c", "commit.gpgsign=false"]
+COMMIT = [*GIT_ID, "commit", "--no-verify", "-m"]
 
 
 class ProjectError(Exception): ...
@@ -64,6 +67,10 @@ class Project:
         if shutil.which("git") is None:
             raise ProjectError("git is required but was not found on PATH")
         root = Path(root)
+        if root.is_dir() and not (root / ".beyondml").is_dir() and any(root.iterdir()):
+            # never take over someone's folder or git repo: checkpoints would commit their files
+            raise ProjectError(f"{root} is not empty and is not a BeyondML project. Create the project in a new "
+                               "folder (for example `beyondml init my-project`) and pass your data with --data.")
         for d in DIRS:
             (root / d).mkdir(parents=True, exist_ok=True)
         for rel, text in {
@@ -79,7 +86,7 @@ class Project:
         if not (root / ".git").exists():
             p._git("init")
             p._git("add", "-A")
-            p._git(*GIT_ID, "commit", "-m", "beyondml: init")
+            p._git(*COMMIT, "beyondml: init")
         return p
 
     @classmethod
@@ -126,7 +133,7 @@ class Project:
         with self._lock:
             self._git("add", "-A")
             if self._git("status", "--porcelain"):
-                self._git(*GIT_ID, "commit", "-m", message)
+                self._git(*COMMIT, message)
             return self._git("rev-parse", "HEAD")
 
     def restore(self, sha: str, paths: Iterable[str]) -> None:

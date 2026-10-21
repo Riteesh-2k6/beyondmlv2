@@ -98,7 +98,7 @@ def format_event(ev: dict) -> str | None:
         detail = (resp.get("error") or resp.get("errors")) if failed else None
         short = f"{data.get('name')} error: {str(detail)[:100]}" if failed else f"{data.get('name')} ok"
     elif kind == "step_status":
-        short = f"{data.get('id')} {data.get('status')}"
+        short = f"{data.get('id')} {data.get('status')}" + (f" — {data['reason']}" if data.get("reason") else "")
     else:
         short = json.dumps(data, default=str)[:120]
     return f"[{agent}] {kind}: {short}"
@@ -124,26 +124,35 @@ async def _approve(payload: dict) -> bool:
         text = f"Allow {payload['agent']} to run {payload['tool']}({json.dumps(payload['args'], default=str)[:120]})?"
     else:
         text = f"Budget reached ({payload['reason']}). Keep going?"
-    return await asyncio.to_thread(click.confirm, text, default=True)
+    try:
+        return await asyncio.to_thread(click.confirm, text, default=True)
+    except click.Abort:  # no terminal answer (EOF, Ctrl-C at the prompt) means no
+        return False
 
 
 @main.command()
 @click.argument("goal", required=False)
-@click.option("--data", "data", multiple=True, type=click.Path(exists=True), help="Input file or folder (repeatable).")
+@click.option("--data", "data", multiple=True, type=click.Path(), help="Input file or folder (repeatable).")
 @click.option("--project", "project_dir", default=".", show_default=True, type=click.Path(file_okay=False))
 @click.option("--mode", type=click.Choice(["ask", "auto", "autonomous"]), default=None,
               help="ask: confirm every run; auto: confirm installs and network; autonomous: never ask.")
 @click.option("--model", default=None, help="Model for every agent, e.g. ollama_chat/qwen2.5:14b.")
 def run(goal, data, project_dir, mode, model):
     """Plan and build an ML project headless (resumes an unfinished plan when GOAL is omitted)."""
-    from beyondml.harness.run import run_goal
+    from beyondml.harness.run import GoalRequired, run_goal
 
     try:
         plan = asyncio.run(run_goal(Path(project_dir), goal, [Path(d) for d in data], mode=mode, model=model,
                                     asker=_ask, approver=_approve, on_event=_print_event))
-    except ValueError as e:
+    except GoalRequired as e:
         raise click.UsageError(str(e))
-    click.echo("\n" + "\n".join(f"{s.id}: {s.status}" for s in plan.steps))
+    except Exception as e:  # PlanError, ProjectError, an unreachable model, ...: one line, not a traceback
+        raise click.ClickException(f"{type(e).__name__}: {e}") from None
+    lines = [f"{s.id}: {s.status}" + (f" — {s.last_failure}" if s.status != "done" and s.last_failure else "")
+             for s in plan.steps]
+    click.echo("\n" + "\n".join(lines))
+    if any(s.status != "done" for s in plan.steps):
+        raise SystemExit(1)
 
 
 @main.command()
