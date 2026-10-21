@@ -8,7 +8,7 @@ from __future__ import annotations
 import shutil
 from pathlib import Path
 
-from .pipeline import make_model
+from .pipeline import build_ensemble, make_model
 
 HEADER = '"""The pipeline BeyondML\'s search scored, written out with literals. Edit freely: train.py re-scores it."""\n'
 
@@ -17,6 +17,13 @@ def model_spec(params: dict, names: list[str], is_numeric: list[bool], problem_t
                class_weight: str | None, target: str, raw: str) -> dict:
     return {"kind": "model", "params": dict(params), "names": list(names), "is_numeric": list(is_numeric),
             "problem_type": problem_type, "class_weight": class_weight, "target": target, "raw": raw}
+
+
+def ensemble_spec(members: list[dict], names: list[str], is_numeric: list[bool], problem_type: str,
+                  class_weight: str | None, target: str, raw: str, kind: str) -> dict:
+    return {"kind": "ensemble", "method": kind, "members": [dict(m) for m in members], "names": list(names),
+            "is_numeric": list(is_numeric), "problem_type": problem_type, "class_weight": class_weight,
+            "target": target, "raw": raw}
 
 
 # ── rendering ──────────────────────────────────────────────────────────────
@@ -58,23 +65,51 @@ BASE_IMPORTS = ["from sklearn.compose import ColumnTransformer", "from sklearn.i
                 "from sklearn.preprocessing import OneHotEncoder, StandardScaler"]
 
 
-def render_pipeline(spec: dict) -> str:
-    if spec["kind"] != "model":
-        raise ValueError(f"unknown spec kind {spec['kind']!r}")
+def _member(params: dict, spec: dict) -> tuple[set[str], str, list[str]]:
+    """(imports, `make_pipeline(preprocessor(...), Model(...))` expression, used columns) for one params dict."""
     classification = spec["problem_type"] == "classification"
-    params = spec["params"]
     hp = {k: v for k, v in params.items() if k not in ("model", "features")}
     model_import, model_expr = _call(make_model(params["model"], classification, hp, spec["class_weight"]))
     numeric, categorical = _selected(params, spec["names"], spec["is_numeric"])
-    imports = "\n".join(BASE_IMPORTS + [model_import])
-    return (f"{HEADER}{imports}\n\n"
-            f"DATA = {spec['raw']!r}\nTARGET = {spec['target']!r}\nPROBLEM = {spec['problem_type']!r}\n"
+    return {model_import}, f"make_pipeline(preprocessor({numeric!r}, {categorical!r}), {model_expr})", numeric + categorical
+
+
+def _ensemble(spec: dict) -> tuple[set[str], str, list[str]]:
+    classification = spec["problem_type"] == "classification"
+    parts = [_member(p, spec) for p in spec["members"]]
+    built = build_ensemble(spec["members"], spec["names"], spec["is_numeric"], classification,
+                           spec["class_weight"], spec["method"])
+    name = type(built).__name__
+    imports = set().union(*(p[0] for p in parts)) | {f"from sklearn.ensemble import {name}"}
+    members = ",\n        ".join(f'("m{i}", {p[1]})' for i, p in enumerate(parts))
+    if spec["method"] == "stacking":
+        final_import, final_expr = _call(built.final_estimator)
+        imports.add(final_import)
+        tail = f", final_estimator={final_expr}, cv=5"
+    else:
+        tail = f", voting={built.voting!r}" if classification else ""
+    used = [c for c in spec["names"] if any(c in p[2] for p in parts)]
+    return imports, f"{name}(estimators=[\n        {members}]{tail})", used
+
+
+def _module_text(spec: dict, imports: set[str], expr: str, used: list[str], extra: str = "") -> str:
+    return (f"{HEADER}" + "\n".join(BASE_IMPORTS + sorted(imports - set(BASE_IMPORTS))) + "\n\n"
+            f"DATA = {spec['raw']!r}\nTARGET = {spec.get('target')!r}\nPROBLEM = {spec['problem_type']!r}\n"
             f"FEATURES = {spec['names']!r}  # the feature frame build_pipeline() expects\n"
-            f"REQUIRED = {numeric + categorical!r}  # the columns the model actually uses\n\n\n"
+            f"REQUIRED = {used!r}  # the columns the model actually uses\n{extra}\n\n"
             f"{PREPROCESS}\n\n"
             f"def build_pipeline():\n"
-            f"    return make_pipeline(preprocessor({numeric!r}, {categorical!r}),\n"
-            f"                         {model_expr})\n")
+            f"    return {expr}\n")
+
+
+def render_pipeline(spec: dict) -> str:
+    if spec["kind"] == "model":
+        imports, expr, used = _member(spec["params"], spec)
+    elif spec["kind"] == "ensemble":
+        imports, expr, used = _ensemble(spec)
+    else:
+        raise ValueError(f"unknown spec kind {spec['kind']!r}")
+    return _module_text(spec, imports, expr, used)
 
 
 TRAIN_PY = '''"""Train the model: python src/train.py (from the project root). Written by BeyondML; needs only pandas,
@@ -173,7 +208,8 @@ def write_project_code(root: Path, spec: dict) -> list[str]:
     for rel, text in files.items():
         (Path(root) / rel).write_text(text, encoding="utf-8")
     written = list(files)
-    if spec.get("params", {}).get("model") == "MLP":
+    models = [spec["params"]["model"]] if spec["kind"] == "model" else [m["model"] for m in spec.get("members", [])]
+    if "MLP" in models:
         shutil.copyfile(Path(__file__).with_name("mlp.py"), src / "mlp.py")
         written.append("src/mlp.py")
     return written

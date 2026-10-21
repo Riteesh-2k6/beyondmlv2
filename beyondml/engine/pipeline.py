@@ -1,13 +1,16 @@
 """The one place a tabular sklearn pipeline is built: the GA scores it and export ships it, so they never drift."""
 from __future__ import annotations
 
+import json
+
 import pandas as pd
 from sklearn.compose import ColumnTransformer
 from sklearn.ensemble import (
     GradientBoostingClassifier, GradientBoostingRegressor, RandomForestClassifier, RandomForestRegressor,
+    StackingClassifier, StackingRegressor, VotingClassifier, VotingRegressor,
 )
 from sklearn.impute import SimpleImputer
-from sklearn.linear_model import LinearRegression, LogisticRegression
+from sklearn.linear_model import LinearRegression, LogisticRegression, RidgeCV
 from sklearn.neighbors import KNeighborsClassifier, KNeighborsRegressor
 from sklearn.pipeline import Pipeline, make_pipeline
 from sklearn.preprocessing import OneHotEncoder, StandardScaler
@@ -63,3 +66,41 @@ def build_pipeline(params: dict, names: list[str], is_numeric: list[bool], class
     categorical = [names[i] for i in picked if not is_numeric[i]]
     hp = {k: v for k, v in params.items() if k not in ("model", "features")}
     return make_pipeline(preprocessor(numeric, categorical), make_model(params["model"], classification, hp, class_weight))
+
+
+def _key(params: dict) -> str:
+    return json.dumps(params, sort_keys=True, default=list)
+
+
+def distinct_top(population: list[dict], top_n: int) -> list[dict]:
+    """The first `top_n` distinct params of a best-first [{"params", "fitness"}] population."""
+    seen, out = set(), []
+    for entry in population:
+        key = _key(entry["params"])
+        if key not in seen:
+            seen.add(key)
+            out.append(entry["params"])
+            if len(out) == top_n:
+                break
+    return out
+
+
+def final_estimator(classification: bool):
+    return LogisticRegression(max_iter=1000) if classification else RidgeCV()
+
+
+def build_ensemble(members: list[dict], names: list[str], is_numeric: list[bool], classification: bool,
+                   class_weight: str | None = None, kind: str = "stacking"):
+    if kind not in ("stacking", "voting"):
+        raise ValueError(f"unknown ensemble kind {kind!r}; expected stacking or voting")
+    if len(members) < 2:
+        raise ValueError("an ensemble needs at least 2 distinct members")
+    estimators = [(f"m{i}", build_pipeline(p, names, is_numeric, classification, class_weight))
+                  for i, p in enumerate(members)]
+    if kind == "stacking":
+        cls = StackingClassifier if classification else StackingRegressor
+        return cls(estimators=estimators, final_estimator=final_estimator(classification), cv=5)
+    if classification:
+        soft = all(hasattr(est, "predict_proba") for _, est in estimators)
+        return VotingClassifier(estimators=estimators, voting="soft" if soft else "hard")
+    return VotingRegressor(estimators=estimators)
