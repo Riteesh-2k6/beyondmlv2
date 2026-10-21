@@ -92,6 +92,14 @@ async def test_files_changed(tmp_path):
     assert "data/processed/x.csv" in touched
 
 
+async def test_harness_files_not_reported(tmp_path):
+    touched = []
+    env, t = mk(tmp_path, touched=touched)
+    put(env, "src/a.py", "for f in ('plan.json', 'PLAN.md', 'experiments.jsonl', 'out.csv'): open(f, 'a').write('x')")
+    r = await t["run_python"]("src/a.py")
+    assert r["files_changed"] == ["out.csv"] and touched == ["out.csv"]
+
+
 async def test_rejects_outside_script(tmp_path):
     env, t = mk(tmp_path)
     assert (await t["run_python"]("../x.py"))["ok"] is False

@@ -1,4 +1,5 @@
 """Deterministic stand-in for an LLM, so ADK agents can be driven in tests."""
+import inspect
 from collections import defaultdict
 from typing import Callable
 
@@ -35,6 +36,8 @@ class ScriptedLlm(BaseLlm):
         self.calls += 1
         self.seen.append(llm_request)
         parts = entry(llm_request) if callable(entry) else entry
+        if inspect.isawaitable(parts):  # async callables let a test hold the model mid-step
+            parts = await parts
         yield LlmResponse(content=types.Content(role="model", parts=list(parts)))
 
 

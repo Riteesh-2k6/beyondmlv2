@@ -23,6 +23,7 @@ SECRET = re.compile(r"KEY|TOKEN|SECRET|PASSWORD", re.I)
 _NAME = re.compile(r"[A-Za-z0-9_.\[\],<>=!~-]+")
 _INSTALL_LOCK = threading.Lock()
 _SKIP_TOP = {".git", ".beyondml", "agents"}
+_HARNESS_FILES = {"plan.json", "PLAN.md", "experiments.jsonl"}  # the executor writes these concurrently
 TAIL = 200
 _WIN = sys.platform == "win32"
 
@@ -41,9 +42,12 @@ def _snapshot(root: Path, sub: str = ".") -> dict[str, tuple[int, int]]:
     out = {}
     base = root / sub
     for d, dirs, files in os.walk(base):
-        if Path(d) == root:
+        top = Path(d) == root
+        if top:
             dirs[:] = [x for x in dirs if x not in _SKIP_TOP]
         for f in files:
+            if top and f in _HARNESS_FILES:
+                continue
             p = Path(d, f)
             try:
                 st = p.stat()
