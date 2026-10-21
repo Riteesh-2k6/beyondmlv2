@@ -5,6 +5,7 @@ import warnings
 from collections import Counter
 from dataclasses import dataclass, field
 from pathlib import Path
+from typing import Sequence
 
 import pandas as pd
 
@@ -104,9 +105,11 @@ def _section(r: InputReport) -> str:
     return "\n".join(lines)
 
 
-def run_intake(project: Project, bus: EventBus) -> list[InputReport]:
+def run_intake(project: Project, bus: EventBus, missing: Sequence[tuple[str, str]] = ()) -> list[InputReport]:
+    """`missing` holds (path, problem) for inputs that never reached data/raw (missing or unreadable)."""
     bus.emit("intake", "step_status", {"id": "intake", "status": "running"})
-    reports = []
+    reports = [InputReport(path, _EXT.get(Path(path).suffix.lower(), "unknown"), False, {}, problem)
+               for path, problem in missing]
     raw = project.root / "data" / "raw"
     for entry in sorted(raw.iterdir()) if raw.is_dir() else []:
         rel = entry.relative_to(project.root).as_posix()

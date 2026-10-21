@@ -4,6 +4,7 @@ from __future__ import annotations
 import asyncio
 import threading
 import time
+import uuid
 from typing import Awaitable, Callable
 
 from google.adk.agents.invocation_context import LlmCallsLimitExceededError
@@ -70,12 +71,15 @@ class Executor:
                 keep |= set(other.touched)
             elif other.status == "done":
                 keep |= set(other.outputs)
-        paths = [p for p in step.touched if p not in keep]
-        if step.checkpoint and paths:
+        paths = [p for p in step.touched if p not in keep] if step.checkpoint else []
+        refused = []
+        for p in paths:  # one path at a time, so a refused one (say under data/raw) can't block the rest
             try:
-                self.project.restore(step.checkpoint, paths)
+                self.project.restore(step.checkpoint, [p])
             except ProjectError as e:
-                self.bus.emit("executor", "error", {"code": "restore_failed", "message": f"{step.id}: {e}"})
+                refused.append(str(e))
+        if refused:
+            self.bus.emit("executor", "error", {"code": "restore_failed", "message": f"{step.id}: " + "; ".join(refused)})
         step.touched = []
 
     # ── success check ──────────────────────────────────────────
@@ -127,7 +131,7 @@ class Executor:
         agent = build_step_agent(self.project, self.bus, self.plan, step, self.skills, resolver=self.resolver,
                                  mode=self.mode, asker=self.asker, outcome=outcome, on_touch=self._touch(step_id))
         runner = Runner(app_name=APP_NAME, agent=agent, session_service=self._sessions)
-        session_id = f"{step_id}-{step.attempts}"
+        session_id = f"{step_id}-{step.attempts}-{uuid.uuid4().hex[:6]}"  # never reuse an old plan's conversation
         await ensure_session(self._sessions, session_id)
         message, nudged = user_text("Start your step."), False
         while True:
@@ -136,7 +140,8 @@ class Executor:
             except LlmCallsLimitExceededError:
                 self.bus.emit(step_id, "budget", {"agent": step_id, "reason": "tool-call cap",
                                                   "limit": self.max_tool_calls})
-                if await self.approver({"kind": "budget", "agent": step_id, "reason": "tool-call cap"}):
+                if self.mode != "autonomous" and await self.approver(
+                        {"kind": "budget", "agent": step_id, "reason": "tool-call cap"}):
                     message = user_text("Continue.")
                     continue
                 return outcome, "tool-call cap reached"
@@ -211,6 +216,8 @@ class Executor:
             return False
         reason = "; ".join(reasons)
         self.bus.emit("executor", "budget", {"agent": None, "reason": reason})
+        if self.mode == "autonomous":
+            return True  # nobody to ask: stop cleanly, pending steps stay pending for a later run
         if await self.approver({"kind": "budget", "agent": None, "reason": reason}):
             if self.budget_minutes is not None:
                 self.budget_minutes += self.budget_minutes  # approval grants one more budget's worth

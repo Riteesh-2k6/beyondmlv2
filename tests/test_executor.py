@@ -142,9 +142,48 @@ async def test_tool_call_cap(tmp_path):
         return False
 
     loop = [[fc("list_files", path=".")]]
-    result = await executor(project, bus, plan, {"a": [loop]}, approver=refuse, max_tool_calls=2).run()
+    result = await executor(project, bus, plan, {"a": [loop]}, mode="auto", approver=refuse, max_tool_calls=2).run()
     assert result.step("a").status == "failed"
     assert any(e["kind"] == "budget" for e in bus.replay())
+
+
+async def test_autonomous_tool_call_cap_never_asks(tmp_path):
+    project, bus, plan = make(tmp_path, step("a"))
+    loop = [[fc("list_files", path=".")]]
+    result = await executor(project, bus, plan, {"a": [loop]}, max_tool_calls=2).run()
+    assert result.step("a").last_failure == "tool-call cap reached"
+    assert any(e["kind"] == "budget" for e in bus.replay())
+
+
+async def test_autonomous_budget_stops_without_asking(tmp_path):
+    project, bus, plan = make(tmp_path, step("a"), step("b", ["a"]))
+    finish = [[fc("finish_step", summary="ok", outputs=[])], [txt(".")]]
+    result = await executor(project, bus, plan, {"a": [finish], "b": [finish]}, budget_minutes=0).run()
+    assert [s.status for s in result.steps] == ["done", "pending"]
+    assert any(e["kind"] == "budget" for e in bus.replay())
+
+
+async def test_second_plan_gets_fresh_sessions(tmp_path):
+    project, bus, plan = make(tmp_path, step("a"))
+    finish = [[fc("finish_step", summary="ok", outputs=[])], [txt(".")]]
+    await executor(project, bus, plan, {"a": [finish]}).run()
+    again = Plan.from_dict({"goal": "g2", "metric": "f1", "budget": {}, "steps": [step("a")]})
+    save_plan(project, again)
+    second = executor(project, bus, again, {"a": [finish]})
+    assert (await second.run()).step("a").status == "done"
+    assert len(second.resolver.models["a"][0].seen[0].contents) == 1  # only "Start your step.", no old history
+
+
+async def test_restore_skips_refused_paths(tmp_path):
+    project, bus, plan = make(tmp_path, step("a"))
+    project.write("a.txt", "v1")
+    sha = project.checkpoint("v1")
+    project.write("a.txt", "v2")
+    a = plan.step("a")
+    a.checkpoint, a.touched = sha, ["data/raw/r.csv", "a.txt"]
+    executor(project, bus, plan, {})._restore(a)
+    assert (tmp_path / "a.txt").read_text(encoding="utf-8") == "v1"
+    assert any(e["kind"] == "error" for e in bus.replay())
 
 
 async def test_three_tool_errors_fail(tmp_path):

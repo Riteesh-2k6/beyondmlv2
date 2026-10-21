@@ -138,3 +138,11 @@ def test_plan_md_cells_single_line(tmp_path):
     p = Project.init(tmp_path)
     save_plan(p, make(s("a", goal="x|y\nz")))
     assert "| a | eda | pending |  | x\\|y z |" in p.read("PLAN.md")
+
+
+def test_from_model_resets_runtime_fields():
+    d = make(s("a", status="done", attempts=5, checkpoint="abc", touched=["x"], summary="s",
+               last_failure="f")).to_dict()
+    a = Plan.from_model(d).step("a")
+    assert (a.status, a.attempts, a.checkpoint, a.touched, a.summary, a.last_failure) == \
+        ("pending", 0, None, [], "", "")

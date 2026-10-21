@@ -106,3 +106,27 @@ async def test_plan_rejected_runs_nothing(tmp_path):
                           asker=ask, approver=reject)
     assert asked == ["plan"] and [s.status for s in plan.steps] == ["pending", "pending"]
     assert Project.open(tmp_path / "proj").ledger() == [] and load_plan(Project.open(tmp_path / "proj"))
+
+
+async def reject(payload):
+    return False
+
+
+async def test_missing_data_path_reported(tmp_path):
+    resolver = scripted_resolver({"planner": [[[fc("submit_plan", plan=PLAN)], [txt("planned")]]]})
+    await run_goal(tmp_path / "proj", "predict survival", [TITANIC, tmp_path / "nope.csv"], mode="auto",
+                   resolver=resolver, asker=ask, approver=reject)
+    text = (tmp_path / "proj/DATA.md").read_text(encoding="utf-8")
+    assert "nope.csv" in text and "unusable" in text and "titanic.csv" in text
+
+
+async def test_new_goal_updates_project_md(tmp_path):
+    project = Project.init(tmp_path, goal="old goal")
+    done = Plan.from_dict({"goal": "old goal", "metric": "f1", "budget": {},
+                           "steps": [{"id": "a", "skill": "python-step", "goal": "a"}]})
+    done.step("a").status = "done"
+    save_plan(project, done)
+    resolver = scripted_resolver({"planner": [[[fc("submit_plan", plan=PLAN)], [txt("planned")]]]})
+    await run_goal(tmp_path, "new goal", mode="auto", resolver=resolver, asker=ask, approver=reject)
+    text = project.read("PROJECT.md")
+    assert "new goal" in text and "old goal" not in text

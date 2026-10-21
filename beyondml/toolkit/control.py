@@ -40,12 +40,12 @@ def control_tools(env: ToolEnv) -> list[Callable]:
             plan: Object with goal, metric, budget and steps.
         """
         try:
-            new = Plan.from_dict(plan)
-            errs = new.validate(env.skill_names)
+            new = Plan.from_model(plan)
+            old = load_plan(env.project)
+            merged = old.merge_revision(new) if old else new  # validate the merge: a revision may omit done steps
+            errs = merged.validate(env.skill_names)
             if errs:
                 return {"ok": False, "errors": errs}
-            old = load_plan(env.project)
-            merged = old.merge_revision(new) if old else new
             save_plan(env.project, merged)
         except ValueError as e:
             return {"ok": False, "errors": [str(e)]}

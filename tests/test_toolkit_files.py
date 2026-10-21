@@ -6,7 +6,7 @@ from beyondml.toolkit.control import control_tools
 from beyondml.toolkit.env import AUTONOMOUS_ANSWER, StepOutcome, ToolEnv
 from beyondml.toolkit.files import file_tools
 from beyondml.workspace.events import EventBus
-from beyondml.workspace.plan import load_plan
+from beyondml.workspace.plan import Plan, load_plan, save_plan
 from beyondml.workspace.project import Project
 
 
@@ -98,12 +98,33 @@ async def test_update_plan_rejects_invalid(tmp_path):
     assert r["ok"] is False and r["errors"] and env.project.read("plan.json") == before
 
 
+def seed(env, steps):
+    save_plan(env.project, Plan.from_dict(plan(steps)))
+
+
 async def test_update_plan_keeps_done(tmp_path):
     env = mk(tmp_path)
     up = tools(control_tools(env))["update_plan"]
-    up(plan([step("a", status="done")]))
+    seed(env, [step("a", status="done")])
     assert up(plan([step("a")]))["ok"]
     assert load_plan(env.project).step("a").status == "done"
+
+
+async def test_update_plan_resets_model_status(tmp_path):
+    env = mk(tmp_path)
+    up = tools(control_tools(env))["update_plan"]
+    assert up(plan([step("a", status="done")]))["ok"]
+    assert load_plan(env.project).step("a").status == "pending"
+
+
+async def test_update_plan_omits_done_dependency(tmp_path):
+    env = mk(tmp_path)
+    up = tools(control_tools(env))["update_plan"]
+    seed(env, [step("a", status="done"), step("b", ["a"])])
+    r = up(plan([step("b", ["a"]), step("c", ["b"])]))
+    assert r["ok"], r
+    merged = load_plan(env.project)
+    assert merged.step("a").status == "done" and [s.id for s in merged.steps] == ["b", "c", "a"]
 
 
 async def test_list_files_refuses_escape(tmp_path):

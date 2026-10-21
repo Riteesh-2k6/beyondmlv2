@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
+import re
 from pathlib import Path
 from typing import Callable, Sequence
 
@@ -22,14 +23,30 @@ async def _pump(queue: asyncio.Queue, on_event: Callable[[dict], None]) -> None:
         on_event(await queue.get())
 
 
+class GoalRequired(ValueError): ...
+
+
+def _set_goal(project: Project, goal: str) -> None:
+    text = project.read("PROJECT.md")
+    if "## Goal" in text:
+        text = re.sub(r"## Goal\n.*?(?=\n## |\Z)", lambda m: f"## Goal\n{goal}\n", text, count=1, flags=re.S)
+    else:
+        text = text.rstrip() + f"\n\n## Goal\n{goal}\n"
+    project.write("PROJECT.md", text)
+
+
 async def run_goal(root: Path, goal: str | None, data: Sequence[Path] = (), *, mode: str | None = None,
                    model: str | None = None, resolver: ModelResolver | None = None,
                    asker: Asker, approver: Approver, on_event: Callable[[dict], None] | None = None) -> Plan:
     root = Path(root)
     project = Project.open(root) if (root / ".beyondml").is_dir() else Project.init(root, goal)
+    missing = []
     for path in data:
-        project.add_data(Path(path))
-    if data:
+        try:
+            project.add_data(Path(path))
+        except OSError as e:  # a bad input is reported in DATA.md, it doesn't stop the run
+            missing.append((str(path), f"{type(e).__name__}: {e}"))
+    if len(missing) < len(data):
         project.checkpoint("add data")
     skills = discover(project)
     settings = project.settings()
@@ -42,8 +59,9 @@ async def run_goal(root: Path, goal: str | None, data: Sequence[Path] = (), *, m
         plan = load_plan(project)
         if plan is None or plan.is_finished():
             if not goal:
-                raise ValueError("a goal is required to start a new plan")
-            run_intake(project, bus)
+                raise GoalRequired("a goal is required to start a new plan")
+            _set_goal(project, goal)  # PROJECT.md is what every agent reads as the goal
+            run_intake(project, bus, missing)
             plan = await make_plan(project, bus, skills, resolver=resolve, goal=goal)
             if mode != "autonomous" and not await approver({"kind": "plan", "plan": plan.to_dict()}):
                 return plan

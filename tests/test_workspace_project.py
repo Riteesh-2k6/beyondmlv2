@@ -144,3 +144,33 @@ def test_settings_not_aliased(tmp_path):
 def test_lock_shared_across_instances(tmp_path):
     p = Project.init(tmp_path)
     assert Project.open(tmp_path)._lock is Project.open(tmp_path)._lock is p._lock
+
+
+def test_init_refuses_non_empty_folder(tmp_path):
+    (tmp_path / "notes.txt").write_text("mine", encoding="utf-8")
+    with pytest.raises(ProjectError, match="not empty"):
+        Project.init(tmp_path)
+    assert not (tmp_path / ".beyondml").exists()
+
+
+def test_init_refuses_existing_git_repo(tmp_path):
+    git(tmp_path, "init")
+    with pytest.raises(ProjectError):
+        Project.init(tmp_path)
+    assert not (tmp_path / ".beyondml").exists()
+
+
+def test_gitignore_ignores_pycache(tmp_path):
+    assert "__pycache__/" in Project.init(tmp_path).read(".gitignore")
+
+
+def test_commits_ignore_gpgsign_and_hooks(tmp_path, monkeypatch):
+    cfg = tmp_path / "gitconfig"
+    cfg.write_text("[commit]\n\tgpgsign = true\n[gpg]\n\tprogram = no-such-gpg-binary\n", encoding="utf-8")
+    monkeypatch.setenv("GIT_CONFIG_GLOBAL", str(cfg))
+    root = tmp_path / "p"
+    p = Project.init(root)  # the first commit must not try to sign
+    (root / ".git/hooks/pre-commit").write_text("#!/bin/sh\nexit 1\n", encoding="utf-8")
+    p.write("a.txt", "x")
+    before = git(root, "rev-parse", "HEAD").strip()
+    assert p.checkpoint("x") != before

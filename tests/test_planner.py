@@ -82,3 +82,24 @@ async def test_replan_keeps_done(tmp_path):
                           failure={"step": "b", "reason": "boom", "summary": ""})
     assert result.step("a").status == "done" and result.step("a").goal == "clean"
     assert "c" in [s.id for s in result.steps] and load_plan(project).to_dict() == result.to_dict()
+
+
+async def test_replan_relisted_failed_step_runs_again(tmp_path):
+    old = Plan.from_dict(plan(step("a"), step("b", ["a"])))
+    old.step("a").status = "done"
+    old.step("b").status, old.step("b").attempts, old.step("b").last_failure = "failed", 2, "boom"
+    revision = old.to_dict()  # the model re-submits the plan it was shown, failed step included
+    project, bus, resolver = _setup(tmp_path, [[[fc("submit_plan", plan=revision)], [txt("done")]]])
+    save_plan(project, old)
+    result = await replan(project, bus, SKILLS, resolver=resolver, plan=old,
+                          failure={"step": "b", "reason": "boom", "summary": ""})
+    b = result.step("b")
+    assert (b.status, b.attempts) == ("pending", 0) and not result.is_finished()
+    assert result.step("a").status == "done"
+
+
+async def test_model_plan_cannot_mark_steps_done(tmp_path):
+    sneaky = plan({**step("clean"), "status": "done"}, step("train", ["clean"]))
+    project, bus, resolver = _setup(tmp_path, [[[fc("submit_plan", plan=sneaky)], [txt("done")]]])
+    result = await make_plan(project, bus, SKILLS, resolver=resolver, goal="predict churn")
+    assert [s.status for s in result.steps] == ["pending", "pending"]
