@@ -35,14 +35,20 @@ def live_line(ev: dict) -> Text | None:
         return Text.assemble(("■ ", STATUS_COLOR.get(d.get("status"), MUTED)), status_text(d.get("status", "?")),
                              (f"  {d.get('reason')}" if d.get("reason") else "", MUTED))
     if kind == "question":
-        return Text.assemble(("? ", "#EAB308"), str(d.get("question", "")),
-                             (f"  → {d['answer']}" if "answer" in d else "", "#22C55E")) if "id" in d else None
+        if "id" not in d:
+            return None
+        if d.get("cancelled"):
+            return Text.assemble(("? ", "#F97316"), str(d.get("question", "")), ("  → cancelled", MUTED))
+        return Text.assemble(("? ", "#F97316"), str(d.get("question", "")),
+                             (f"  → {d['answer']}" if "answer" in d else "", "#22C55E"))
     if kind == "approval_request":
         if "id" not in d:
             return None
         what = d.get("tool") or d.get("kind")
+        if d.get("cancelled"):
+            return Text.assemble(("! ", "#F97316"), f"approval: {what}", ("  → cancelled", MUTED))
         verdict = "" if "answer" not in d else ("  → approved" if d["answer"] else "  → denied")
-        return Text.assemble(("! ", "#EAB308"), f"approval: {what}", (verdict, "#22C55E" if d.get("answer") else "#EF4444"))
+        return Text.assemble(("! ", "#F97316"), f"approval: {what}", (verdict, "#22C55E" if d.get("answer") else "#EF4444"))
     if kind == "generation":
         return Text(f"gen {d.get('gen')}  best {fmt_num(d.get('best_fitness'))}  mean {fmt_num(d.get('mean_fitness'))}"
                     f"  diversity {fmt_num(d.get('diversity'))}", style=DIM)

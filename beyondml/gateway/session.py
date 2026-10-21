@@ -8,6 +8,7 @@ import uuid
 from pathlib import Path
 from typing import Sequence
 
+from beyondml.gateway.state import SessionState
 from beyondml.harness.adk import ModelResolver, default_resolver
 from beyondml.harness.lead import chat as lead_chat, make_lead
 from beyondml.harness.run import run_goal
@@ -43,6 +44,13 @@ class Session:
         self.pending: dict[str, dict] = {}  # id -> {agent, kind, data, future}
         self.run_task: asyncio.Task | None = None
         self.loop: asyncio.AbstractEventLoop | None = None
+        self._close_orphaned_prompts()
+
+    def _close_orphaned_prompts(self) -> None:
+        """A prompt still open on disk belongs to a process that has exited; nobody can answer it now."""
+        for prompt in SessionState.fold(self.bus.replay()).pending.values():
+            data = {k: v for k, v in prompt.items() if k not in ("event", "agent")}
+            self.bus.emit(prompt["agent"], prompt["event"], {**data, "answer": None, "cancelled": True})
 
     # ── loop plumbing ────────────────────────────────────────
     def bind(self) -> None:
@@ -98,6 +106,9 @@ class Session:
         self.bus.emit(agent, kind, data)
         try:
             return await future
+        except asyncio.CancelledError:  # the run was stopped: close the prompt for every client
+            self.bus.emit(agent, kind, {**data, "answer": None, "cancelled": True})
+            raise
         finally:
             self.pending.pop(pid, None)
 

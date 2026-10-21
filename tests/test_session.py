@@ -162,3 +162,27 @@ async def test_question_copies_options_from_the_tool_event(tmp_path):
     assert session.summary()["pending"][0]["options"] == ["rf", "xgb"]
     await session.answer(pid, "xgb")
     assert await task == "xgb"
+
+
+async def test_prompts_left_by_an_exited_process_are_closed_on_open(tmp_path):
+    first = Session(tmp_path, goal="g")
+    first.bus.emit("planner", "approval_request", {"id": "old1", "kind": "plan", "plan": {}})
+    first.bus.emit("a", "question", {"id": "old2", "question": "q?"})
+    first.bus.emit("a", "question", {"id": "done1", "question": "q?"})
+    first.bus.emit("a", "question", {"id": "done1", "question": "q?", "answer": "x"})
+    second = Session(tmp_path)  # a new process: nobody holds old1/old2 any more
+    events = second.bus.replay()
+    assert SessionState.fold(events).pending == {}
+    closed = [e for e in events if e["data"].get("cancelled")]
+    assert sorted(e["data"]["id"] for e in closed) == ["old1", "old2"]
+    assert all(e["data"]["answer"] is None for e in closed)
+
+
+async def test_stop_closes_the_parked_prompt_in_the_event_log(tmp_path):
+    resolver = scripted_resolver({"planner": [PLANNER], "a": [ASKER]})
+    session = Session(tmp_path, mode="ask", resolver=resolver, goal="g")
+    await session.start("g")
+    await wait_for(lambda: session.pending)
+    session.stop()
+    await wait_for(lambda: not session.running)
+    assert SessionState.fold(session.bus.replay()).pending == {}

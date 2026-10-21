@@ -64,13 +64,15 @@ function Row({ ev }: { ev: BusEvent }) {
     case 'question':
       if (!('id' in d)) return null
       return (
-        <div className="flex gap-2 py-0.5">{time}<p className="text-sm"><span className="text-orange">? </span>{String(d.question)}{'answer' in d && <span className="text-success"> → {String(d.answer)}</span>}</p></div>
+        <div className="flex gap-2 py-0.5">{time}<p className="text-sm"><span className="text-orange">? </span>{String(d.question)}
+          {d.cancelled ? <span className="text-muted"> → cancelled</span> : 'answer' in d && <span className="text-success"> → {String(d.answer)}</span>}</p></div>
       )
     case 'approval_request':
       if (!('id' in d)) return null
       return (
         <div className="flex gap-2 py-0.5">{time}<p className="text-sm"><span className="text-orange">! </span>approval: {String(d.tool ?? d.kind)}
-          {'answer' in d && <span className={d.answer ? 'text-success' : 'text-danger'}> → {d.answer ? 'approved' : 'denied'}</span>}</p></div>
+          {d.cancelled ? <span className="text-muted"> → cancelled</span>
+            : 'answer' in d && <span className={d.answer ? 'text-success' : 'text-danger'}> → {d.answer ? 'approved' : 'denied'}</span>}</p></div>
       )
     case 'generation':
       return (
