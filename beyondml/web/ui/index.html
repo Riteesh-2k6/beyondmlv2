@@ -3,9 +3,25 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="color-scheme" content="dark" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <title>BeyondML</title>
   </head>
   <body>
+    <!--
+      THESIS: an operator's console for watching agents work. The plan graph is the page, and every agent opens to the
+      literal instruction it was given. It refuses the dashboard of metric tiles.
+      OWN-WORLD: obsidian #09090B ground, #18181B panels, #27272A hairlines, one orange #F97316 for running, selected and
+      primary; green/red live only in status marks; Geist for labels, Geist Mono for ids, numbers, code and events;
+      2px corners, 1px lines, no shadows except the modal.
+      STORY: the user sees what the harness is doing right now, trusts it because nothing is hidden (instruction, tool
+      calls, ledger), and intervenes at prompts.
+      FIRST VIEWPORT: a 40px top bar (project, goal, four screens, mode/model, run state, stop); the plan board with
+      step rows on the left two thirds and the dependency graph on the right; the lead-agent dock pinned at the bottom.
+      FORM: fixed by the sub-project 4 spec (six screens); code-led; established world inherited from PRODUCT.md.
+      FINISH: unreviewed and undocumented is unfinished; this build ends with the finish review, the verdict, DESIGN.md,
+      and every shipping raster carrying its provenance.
+    -->
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>

@@ -5,58 +5,69 @@
 @tailwind components;
 @tailwind utilities;
 
-/* ── Root ─────────────────────────────────────────── */
+/* Obsidian tokens: the same values drive beyondml/tui/theme.py. */
 :root {
   color-scheme: dark;
-  background-color: #09090B;
-  color: #E4E4E7;
+  --bg: #09090B;
+  --surface: #18181B;
+  --line: #27272A;
+  --line-2: #3F3F46;
+  --muted: #85858F;
+  --fg: #E4E4E7;
+  --orange: #F97316;
+}
+
+html, body, #root { height: 100%; }
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--fg);
+  font-family: 'Geist', ui-sans-serif, system-ui, sans-serif;
+  font-size: 14px;
+  line-height: 1.45;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
 }
 
 * { box-sizing: border-box; }
 
-body {
-  margin: 0;
-  font-family: 'Geist', ui-sans-serif, system-ui, sans-serif;
-  -webkit-font-smoothing: antialiased;
+.font-mono, code, kbd, pre, table { font-variant-numeric: tabular-nums; }
+pre { margin: 0; }
+h1, h2, h3 { margin: 0; text-wrap: balance; }
+p { margin: 0; }
+ul, ol { margin: 0; padding: 0; list-style: none; }
+button { font: inherit; color: inherit; background: none; border: 0; padding: 0; cursor: pointer; }
+button:disabled { cursor: not-allowed; }
+a { color: inherit; text-decoration: none; text-underline-offset: 3px; }
+input, select, textarea { font: inherit; color: inherit; }
+select { appearance: none; background-image: linear-gradient(45deg, transparent 50%, var(--muted) 50%), linear-gradient(135deg, var(--muted) 50%, transparent 50%);
+  background-position: calc(100% - 11px) 55%, calc(100% - 7px) 55%; background-size: 4px 4px; background-repeat: no-repeat; padding-right: 20px; }
+
+/* Browser surfaces carry the design too. */
+::selection { background: var(--orange); color: var(--bg); }
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-track { background: var(--bg); }
+::-webkit-scrollbar-thumb { background: var(--line-2); border: 2px solid var(--bg); border-radius: 4px; }
+::-webkit-scrollbar-thumb:hover { background: var(--muted); }
+* { scrollbar-color: var(--line-2) var(--bg); scrollbar-width: thin; }
+input, textarea { caret-color: var(--orange); }
+:focus-visible { outline: 1.5px solid var(--orange); outline-offset: 1px; border-radius: 2px; }
+details > summary::-webkit-details-marker { display: none; }
+
+/* The one authored motion: a running step breathes. */
+@keyframes breathe { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
+.mark-running { animation: breathe 1.6s cubic-bezier(0.4, 0, 0.2, 1) infinite; transform-origin: center; }
+
+@keyframes shimmer { from { background-position: 200% 0; } to { background-position: -200% 0; } }
+.skeleton { background: linear-gradient(90deg, var(--surface) 25%, #1F1F23 50%, var(--surface) 75%); background-size: 200% 100%;
+  animation: shimmer 1.4s ease-in-out infinite; border-radius: 2px; }
+
+@keyframes modal-in { from { opacity: 0; transform: translateY(6px) scale(0.985); } to { opacity: 1; transform: none; } }
+.modal-in { animation: modal-in 180ms cubic-bezier(0.16, 1, 0.3, 1); }
+
+.js-plotly-plot .plotly .modebar { display: none; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; }
 }
-
-/* ── Browser surfaces ─────────────────────────────── */
-::selection {
-  background: #F97316;
-  color: #09090B;
-}
-
-::-webkit-scrollbar       { width: 5px; height: 5px; }
-::-webkit-scrollbar-track { background: #09090B; }
-::-webkit-scrollbar-thumb { background: #27272A; border-radius: 3px; }
-::-webkit-scrollbar-thumb:hover { background: #3F3F46; }
-
-input, textarea   { caret-color: #F97316; }
-
-*:focus-visible {
-  outline: 1.5px solid #F97316;
-  outline-offset: 2px;
-  border-radius: 2px;
-}
-
-/* ── Rich markup log line classes ─────────────────── */
-.log-agent-header { color: #D946EF; font-weight: 700; }
-.log-success      { color: #22C55E; font-weight: 700; }
-.log-info         { color: #22D3EE; font-weight: 700; }
-.log-warn         { color: #EAB308; font-weight: 700; }
-.log-error-text   { color: #EF4444; }
-.log-accent       { color: #F97316; font-weight: 700; }
-.log-muted        { color: #71717A; }
-.log-bold         { font-weight: 700; }
-.log-italic       { font-style: italic; }
-
-/* ── Plotly chart container dark override ─────────── */
-.plotly-chart-wrap .js-plotly-plot { background: transparent !important; }
-
-/* ── Panel borders  ───────────────────────────────── */
-.panel-center { border: 1px solid #F97316; }
-.panel-side   { border: 1px solid #27272A; }
-
-/* ── Utility: hide scrollbar but keep scrollable ──── */
-.no-scrollbar::-webkit-scrollbar { display: none; }
-.no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
