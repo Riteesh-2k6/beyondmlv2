@@ -12,7 +12,6 @@ Sections run per dataset (sections not run are null in the JSON):
 import argparse
 import json
 import os
-import random
 import sys
 import time
 from pathlib import Path
@@ -34,33 +33,30 @@ def _profile(df):
     return DatasetProfiler(df, target_column="target").run()
 
 
-def _run_v1(df, profile, pop_size, generations, model_choice, seed):
-    """One seeded v1 run. Times optimiser construction + evolve() only.
+V1_GONE = (
+    "bench_evolve: engine v1 was replaced by an adapter over v2 (Task 6), so it can no longer be measured here.\n"
+    "Its recorded numbers are tests/data/evolve_v1_baseline.json and data/evolve_benchmark_v1_adult.json;\n"
+    "reproduce them from commit 8553b86."
+)
+
+
+def _run_v2(df, profile, pop_size, generations, model_choice, seed):
+    """One seeded v2 run. Times evolve_tabular() only; time-to-best is the GenStats.seconds of the first
+    generation whose best_fitness equals the final best.
 
     Returns (seconds, time_to_best_s, best).
     """
-    from beyondml.engine.genetic import GeneticModelOptimizer
+    from beyondml.engine.evolve import Budget
+    from beyondml.engine.fitness import evolve_tabular
 
-    marks = []  # (seconds since evolve() start, best_fitness) per generation
-    t_evolve = [0.0]
-
-    def on_gen(summary):
-        marks.append((time.perf_counter() - t_evolve[0], summary["best_fitness"]))
-
-    random.seed(seed)
-    np.random.seed(seed)
     t0 = time.perf_counter()
-    opt = GeneticModelOptimizer(
-        df, "target", profile, pop_size=pop_size, generations=generations,
-        model_choice=model_choice, gen_callback=on_gen,
+    result = evolve_tabular(
+        df, "target", profile, models=(model_choice,) if model_choice else None, pop_size=pop_size,
+        budget=Budget(max_generations=generations), seed=seed,
     )
-    t_evolve[0] = time.perf_counter()
-    _, best = opt.evolve()
     seconds = time.perf_counter() - t0
-
-    final = round(best.fitness, 4)
-    time_to_best = next((t for t, f in marks if f == final), marks[-1][0])
-    return seconds, time_to_best, best
+    time_to_best = next(h.seconds for h in result.history if h.best_fitness == result.best.fitness)
+    return seconds, time_to_best, result.best
 
 
 def _speed(runner, df, profile):
@@ -96,9 +92,9 @@ def main():
     ap.add_argument("--dataset", choices=["latency", "quality", "adult"], default="quality")
     args = ap.parse_args()
 
-    if args.engine == "v2":
-        sys.exit("bench_evolve: engine v2 not implemented yet")
-    runner = _run_v1
+    if args.engine == "v1":
+        sys.exit(V1_GONE)
+    runner = _run_v2
 
     from beyondml.engine.benchmarker import latency_frame, quality_frame
 

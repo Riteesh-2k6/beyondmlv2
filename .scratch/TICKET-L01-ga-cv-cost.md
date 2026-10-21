@@ -1,7 +1,8 @@
 # [TICKET-L01] GA: 5-fold CV is the entire bottleneck (85.3% of total time)
 parent: MAP-002
 labels: wayfinder:task
-status: open
+status: superseded
+superseded-by: evolution engine v2 (docs/superpowers/specs/2026-10-19-beyondml-ml-harness-design.md, section 7)
 
 ## Finding
 
