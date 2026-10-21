@@ -1,7 +1,7 @@
 # [TICKET-007] TUI escalation modal — surface low-confidence decisions to user
 parent: MAP-001
 labels: wayfinder:task
-status: open
+status: superseded
 blocked-by: TICKET-002
 blocks: TICKET-008
 
@@ -26,3 +26,5 @@ Decisions:
    - `format_escalation_prompt` produces valid string with all fields
    - default `get_user_input=None` auto-accepts tentative answer
    - explicit override input routes to correct answer string
+
+Superseded 2026-10-21 by docs/superpowers/specs/2026-10-19-beyondml-ml-harness-design.md (core harness, sub-project 1).

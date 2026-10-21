@@ -1,7 +1,7 @@
 # [TICKET-005] Wire constrained decisions into FeatureAgent
 parent: MAP-001
 labels: wayfinder:task
-status: open
+status: superseded
 blocked-by: TICKET-002
 blocks: TICKET-008
 
@@ -21,3 +21,5 @@ Decisions:
    - high-confidence Noul "no" → feature in `features_rejected`, not in `df`
    - low-confidence Noul → routes to `get_user_input` for human call
    - eval() failure still rejects regardless of confidence
+
+Superseded 2026-10-21 by docs/superpowers/specs/2026-10-19-beyondml-ml-harness-design.md (core harness, sub-project 1).

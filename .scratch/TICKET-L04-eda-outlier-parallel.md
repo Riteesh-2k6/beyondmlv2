@@ -1,7 +1,7 @@
 # [TICKET-L04] EDA + Outlier run serially — 2 independent agents (6.2% of total)
 parent: MAP-002
 labels: wayfinder:task
-status: open
+status: superseded
 
 ## Finding
 
@@ -33,3 +33,5 @@ Expected speedup: 2× on EDA+Outlier block (on Ollama: saves 3-18s).
 ## Verified 2026-10-19
 - asyncio.gather of eda_agent and outlier_agent exists in beyondml/web/runner.py, but both call blocking self.llm.chat so they still run serially; needs achat (L05).
 - outlier_agent get_user_input concurrent with EDA not addressed.
+
+Superseded 2026-10-21 by docs/superpowers/specs/2026-10-19-beyondml-ml-harness-design.md (core harness, sub-project 1).

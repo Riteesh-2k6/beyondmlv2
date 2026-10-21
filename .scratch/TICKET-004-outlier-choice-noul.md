@@ -1,7 +1,7 @@
 # [TICKET-004] Wire constrained decisions into OutlierAgent
 parent: MAP-001
 labels: wayfinder:task
-status: open
+status: superseded
 blocked-by: TICKET-002
 blocks: TICKET-008
 
@@ -21,3 +21,5 @@ Decisions:
    - high-confidence Choice → auto-applies without TUI prompt
    - low-confidence Choice → falls through to `get_user_input` with pre-filled recommendation
    - Noul "real signal" high-confidence yes → forces `keep` regardless of strategy Choice
+
+Superseded 2026-10-21 by docs/superpowers/specs/2026-10-19-beyondml-ml-harness-design.md (core harness, sub-project 1).

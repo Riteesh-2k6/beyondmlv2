@@ -1,7 +1,7 @@
 # [TICKET-L05] llm.chat() is synchronous — blocks the event loop
 parent: MAP-002
 labels: wayfinder:task
-status: open
+status: superseded
 
 ## Finding
 
@@ -32,3 +32,5 @@ Expected impact: unlocks ALL gather()-based parallelism in L03 and L04.
 ## Verified 2026-10-19
 - No async def achat in LLMProvider base or providers under beyondml/llm/ (grep 'achat' finds nothing in beyondml/ or tests/).
 - All agents still call self.llm.chat (drift, eda, evaluator, explainability, feature, imputation, leakage, orchestrator, outlier, reflection, sanity).
+
+Superseded 2026-10-21 by docs/superpowers/specs/2026-10-19-beyondml-ml-harness-design.md (core harness, sub-project 1).

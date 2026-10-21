@@ -1,7 +1,7 @@
 # [TICKET-L02] Profiler called 4× serially — redundant computation
 parent: MAP-002
 labels: wayfinder:task
-status: open
+status: superseded
 
 ## Finding
 
@@ -29,3 +29,5 @@ Expected speedup: eliminates ~0.2s on small datasets; 1-3s on wide datasets (50+
 - No ProfileCache in beyondml/web/runner.py; DatasetProfiler is re-instantiated and run() each time.
 - No partial re-profile.
 - beyondml/engine/profiler.py _calculate_ori still calls _target_analysis() and _outlier_summary() itself instead of taking them as arguments.
+
+Superseded 2026-10-21 by docs/superpowers/specs/2026-10-19-beyondml-ml-harness-design.md (core harness, sub-project 1).

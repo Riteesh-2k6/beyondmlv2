@@ -1,7 +1,7 @@
 # [TICKET-006] Wire constrained decisions into ReflectionAgent
 parent: MAP-001
 labels: wayfinder:task
-status: open
+status: superseded
 blocked-by: TICKET-002
 blocks: TICKET-008
 
@@ -23,3 +23,5 @@ Decisions:
    - score 0.70, gap 0.20 → rule-based "needs_improvement", Noul also fires and confirms
    - score 0.83 (borderline) → rule-based skips, Noul decides
    - low-confidence drop decision → get_user_input escalation
+
+Superseded 2026-10-21 by docs/superpowers/specs/2026-10-19-beyondml-ml-harness-design.md (core harness, sub-project 1).

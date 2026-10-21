@@ -1,7 +1,7 @@
 # [TICKET-002] Implement `constrained.py` — the core logprob decision engine
 parent: MAP-001
 labels: wayfinder:task
-status: open
+status: superseded
 blocked-by: TICKET-001
 blocks: TICKET-003, TICKET-004, TICKET-005, TICKET-006, TICKET-007
 
@@ -28,3 +28,5 @@ TDD: write `tests/test_constrained.py` first with MockLLM, covering:
 - score returns a string that is one of the score labels  
 - low confidence raises `LowConfidenceDecision`  
 - fallback path works when logprobs unavailable  
+
+Superseded 2026-10-21 by docs/superpowers/specs/2026-10-19-beyondml-ml-harness-design.md (core harness, sub-project 1).

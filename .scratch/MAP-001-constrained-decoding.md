@@ -1,6 +1,6 @@
 # [MAP-001] Constrained Decoding for BeyondML — Wayfinder Map
 labels: wayfinder:map
-status: open
+status: superseded
 
 ## Destination
 
@@ -32,3 +32,5 @@ A fully local, in-house constrained-decoding layer (`beyondml/llm/constrained.py
 - Integrating TypeSafe's hosted Jev API.
 - Replacing the OrchestratorAgent's path routing (already a single-call LLM decision with hardcoded fallback — not performance-critical enough to change).
 - DL agent or ensemble agent integration (not listed in the evaluation report as integration sites).
+
+Superseded 2026-10-21 by docs/superpowers/specs/2026-10-19-beyondml-ml-harness-design.md (core harness, sub-project 1).

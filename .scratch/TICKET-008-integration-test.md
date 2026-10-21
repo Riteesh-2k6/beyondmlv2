@@ -1,7 +1,7 @@
 # [TICKET-008] Integration test: full pipeline with constrained decisions
 parent: MAP-001
 labels: wayfinder:task
-status: open
+status: superseded
 blocked-by: TICKET-003, TICKET-004, TICKET-005, TICKET-006, TICKET-007
 
 ## Question
@@ -21,3 +21,5 @@ Decisions:
 1. `MockConstrainedLLM` fixture shape — confirm it lives in `tests/conftest.py`.
 2. Which confidence values to inject per agent to exercise both auto-apply and escalation paths.
 3. Assert that `ConstrainedResult.confidence` is in `[0, 1]` for all calls.
+
+Superseded 2026-10-21 by docs/superpowers/specs/2026-10-19-beyondml-ml-harness-design.md (core harness, sub-project 1).

@@ -1,7 +1,7 @@
 # [TICKET-L03] Sanity + Imputation + Leakage run serially — 3 independent LLM calls
 parent: MAP-002
 labels: wayfinder:task
-status: open
+status: superseded
 
 ## Finding
 
@@ -36,3 +36,5 @@ Expected speedup: 3× reduction on these 3 agents (on Ollama: saves ~20-30s).
 
 ## Verified 2026-10-19
 - asyncio.gather exists in beyondml/web/runner.py (sanity, imputation, leakage), but agents call synchronous self.llm.chat inside async run, so calls are not actually concurrent; no asyncio.to_thread/achat (depends on L05).
+
+Superseded 2026-10-21 by docs/superpowers/specs/2026-10-19-beyondml-ml-harness-design.md (core harness, sub-project 1).

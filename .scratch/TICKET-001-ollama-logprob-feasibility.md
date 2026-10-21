@@ -1,7 +1,7 @@
 # [TICKET-001] Verify Ollama logprob API availability and design fallback
 parent: MAP-001
 labels: wayfinder:research
-status: open
+status: superseded
 blocks: TICKET-002
 
 ## Question
@@ -18,3 +18,5 @@ Specifically:
 ## Resolution
 
 <!-- filled on close -->
+
+Superseded 2026-10-21 by docs/superpowers/specs/2026-10-19-beyondml-ml-harness-design.md (core harness, sub-project 1).
