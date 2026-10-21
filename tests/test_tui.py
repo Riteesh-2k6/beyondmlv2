@@ -244,3 +244,13 @@ async def test_agent_tune_and_figure_file(tmp_path):
         assert "max value 0.78 (trial 3)" in view.evolve_text and "lr  0.3" in view.evolve_text
         assert "accuracy by fold" in view.outputs_text and "fold" in view.outputs_text
         assert "ghost: reports/charts/missing.json could not be read" in view.outputs_text
+
+
+async def test_chat_history_replays_on_open(tmp_path):
+    session = with_plan(tmp_path)
+    session.bus.emit("user", "message_delta", {"text": "what did the plan do?", "partial": False})
+    session.bus.emit("lead", "message_delta", {"text": "it trained a model", "partial": False})
+    app = BeyondMLApp(session)
+    async with app.run_test(size=SIZE) as pilot:
+        await until(pilot, lambda: "it trained a model" in app.chat.transcript())
+        assert "what did the plan do?" in app.chat.transcript()

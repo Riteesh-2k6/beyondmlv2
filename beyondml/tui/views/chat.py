@@ -12,14 +12,18 @@ SPEAKER = {"user": ("you", "#22D3EE"), "lead": ("lead", "#F97316")}
 
 
 class ChatDock(Vertical):
+    def __init__(self, **kw) -> None:
+        super().__init__(**kw)
+        self._lines: list[str] = []
+
     def compose(self) -> ComposeResult:
         yield Static(Text("lead agent", style=MUTED), id="chat-title")
         yield RichLog(id="chat-log", wrap=True, markup=False, highlight=False)
         yield Input(placeholder="message the lead agent  (c to focus, enter to send)", id="chat-input")
 
-    def on_mount(self) -> None:
-        self._lines: list[str] = []
-        for m in self.app.state.chat:
+    def show_history(self, messages: list[dict]) -> None:
+        """Called once by the app after it replays the event log (children mount before that replay)."""
+        for m in messages:
             self._write(m["agent"], m["text"])
 
     def _write(self, agent: str, text: str) -> None:

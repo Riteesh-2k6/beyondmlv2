@@ -97,6 +97,7 @@ class BeyondMLApp(App):
             self.state.apply(ev)
             last = ev["ts"]
         self.query_one(PlanBoard).reload()
+        self.chat.show_history(self.state.chat)
         self.run_worker(self._tail(queue, last), exclusive=True, name="bus")
         self.set_interval(1.0, self._tick)
         self._update_topbar()
