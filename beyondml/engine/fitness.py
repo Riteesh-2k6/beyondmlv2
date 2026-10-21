@@ -12,20 +12,10 @@ from collections.abc import Sequence
 
 import numpy as np
 import pandas as pd
-from sklearn.compose import ColumnTransformer
-from sklearn.ensemble import (
-    GradientBoostingClassifier, GradientBoostingRegressor, RandomForestClassifier, RandomForestRegressor,
-)
-from sklearn.impute import SimpleImputer
-from sklearn.linear_model import LinearRegression, LogisticRegression
 from sklearn.model_selection import KFold, StratifiedKFold, cross_validate, train_test_split
-from sklearn.neighbors import KNeighborsClassifier, KNeighborsRegressor
-from sklearn.pipeline import make_pipeline
-from sklearn.preprocessing import OneHotEncoder, StandardScaler
-from sklearn.svm import SVC, SVR
-from sklearn.tree import DecisionTreeClassifier, DecisionTreeRegressor
 
 from .evolve import Budget, Choice, EvolveResult, Fidelity, Float, Mask, Space, evolve
+from .pipeline import build_pipeline
 
 _BOTH = ("classification", "regression")
 
@@ -95,27 +85,6 @@ def default_ladder(n_rows: int) -> tuple[Fidelity, ...]:
             else (Fidelity(0.25, 3, SCREEN_EFFORT), Fidelity(1.0, 5)))
 
 
-def _make_model(name: str, classification: bool, hp: dict, class_weight):
-    if name == "RandomForest":
-        return (RandomForestClassifier(**hp, class_weight=class_weight, n_jobs=1, random_state=42) if classification
-                else RandomForestRegressor(**hp, n_jobs=1, random_state=42))
-    if name == "LogisticRegression":
-        return LogisticRegression(**hp, class_weight=class_weight)
-    if name == "SVM":
-        return SVC(**hp, class_weight=class_weight) if classification else SVR(**hp)
-    if name == "DecisionTree":
-        return (DecisionTreeClassifier(**hp, class_weight=class_weight, random_state=42) if classification
-                else DecisionTreeRegressor(**hp, random_state=42))
-    if name == "KNN":
-        return KNeighborsClassifier(**hp, n_jobs=1) if classification else KNeighborsRegressor(**hp, n_jobs=1)
-    if name == "GradientBoosting":
-        return (GradientBoostingClassifier(**hp, random_state=42) if classification
-                else GradientBoostingRegressor(**hp, random_state=42))
-    if name == "LinearRegression":
-        return LinearRegression()
-    raise ValueError(f"unknown model {name!r}; expected one of {MODELS}")
-
-
 class TabularFitness:
     """v1's penalised CV score for one params dict at one Fidelity. Picklable; safe to call from threads
     (it only reads shared state and builds a fresh pipeline per call)."""
@@ -149,24 +118,14 @@ class TabularFitness:
     def __call__(self, params: dict, fidelity: Fidelity) -> tuple[float, dict]:
         hp = {k: v for k, v in params.items() if k not in ("model", "features")}
         name = params["model"]
-        fit_hp = hp
+        fit_params = params
         if fidelity.effort < 1 and "n_estimators" in hp:   # a low rung screens with fewer trees
-            fit_hp = dict(hp, n_estimators=max(10, round(hp["n_estimators"] * fidelity.effort)))
-        model = _make_model(name, self.classification, fit_hp, self.class_weight)
-
-        picked = [i for i, bit in enumerate(params["features"]) if bit]
-        selected = [self.names[i] for i in picked]
-        numeric = [self.names[i] for i in picked if self.is_numeric[i]]
-        categorical = [self.names[i] for i in picked if not self.is_numeric[i]]
-        preprocessor = ColumnTransformer([
-            ("num", make_pipeline(SimpleImputer(strategy="median"), StandardScaler()), numeric),
-            ("cat", make_pipeline(SimpleImputer(strategy="constant", fill_value="missing"),
-                                  OneHotEncoder(handle_unknown="ignore")), categorical),
-        ])
-        pipe = make_pipeline(preprocessor, model)
+            fit_params = dict(params, n_estimators=max(10, round(hp["n_estimators"] * fidelity.effort)))
+        pipe = build_pipeline(fit_params, self.names, self.is_numeric, self.classification, self.class_weight)
+        selected = [self.names[i] for i, bit in enumerate(params["features"]) if bit]
 
         idx, y = self._rows(fidelity)
-        X = self.X[selected] if idx is None else self.X[selected].iloc[idx]
+        X = self.X if idx is None else self.X.iloc[idx]
         n_rows = len(y)
 
         smallest = (int(y.value_counts().min()) if idx is not None else self.min_class) if self.classification else n_rows
