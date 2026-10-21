@@ -1,0 +1,13 @@
+{
+  "engine": "v1",
+  "seed": 0,
+  "holdout_accuracy": 0.802381,
+  "best_model": "RandomForest",
+  "pop_size": 10,
+  "generations": 5,
+  "features": [
+    "gender",
+    "class",
+    "embarked"
+  ]
+}
