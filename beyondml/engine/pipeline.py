@@ -50,12 +50,13 @@ def column_kinds(X: pd.DataFrame) -> tuple[list[str], list[bool]]:
     return names, [bool(pd.api.types.is_numeric_dtype(X[c])) for c in names]
 
 
-def preprocessor(numeric: list[str], categorical: list[str]) -> ColumnTransformer:
+def preprocessor(numeric: list[str], categorical: list[str], dense: bool = False) -> ColumnTransformer:
+    """dense=True for clusterers (PCA and silhouette want dense input); supervised models keep sklearn's default."""
     return ColumnTransformer([
         ("num", make_pipeline(SimpleImputer(strategy="median"), StandardScaler()), numeric),
         ("cat", make_pipeline(SimpleImputer(strategy="constant", fill_value="missing"),
                               OneHotEncoder(handle_unknown="ignore")), categorical),
-    ])
+    ], sparse_threshold=0.0 if dense else 0.3)
 
 
 def build_pipeline(params: dict, names: list[str], is_numeric: list[bool], classification: bool,

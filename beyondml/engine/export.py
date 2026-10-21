@@ -53,12 +53,12 @@ def _selected(params: dict, names: list[str], is_numeric: list[bool]) -> tuple[l
     return [names[i] for i in picked if is_numeric[i]], [names[i] for i in picked if not is_numeric[i]]
 
 
-PREPROCESS = '''def preprocessor(numeric, categorical):
+PREPROCESS = '''def preprocessor(numeric, categorical, dense=False):
     return ColumnTransformer([
         ("num", make_pipeline(SimpleImputer(strategy="median"), StandardScaler()), numeric),
         ("cat", make_pipeline(SimpleImputer(strategy="constant", fill_value="missing"),
                               OneHotEncoder(handle_unknown="ignore")), categorical),
-    ])
+    ], sparse_threshold=0.0 if dense else 0.3)
 '''
 BASE_IMPORTS = ["from sklearn.compose import ColumnTransformer", "from sklearn.impute import SimpleImputer",
                 "from sklearn.pipeline import make_pipeline",
@@ -102,11 +102,29 @@ def _module_text(spec: dict, imports: set[str], expr: str, used: list[str], extr
             f"    return {expr}\n")
 
 
+def _cluster(spec: dict) -> tuple[set[str], str, list[str]]:
+    from .clustering import make_clusterer
+
+    params, names = spec["params"], spec["names"]
+    numeric = [n for n, num in zip(names, spec["is_numeric"]) if num]
+    categorical = [n for n, num in zip(names, spec["is_numeric"]) if not num]
+    imports, steps = set(), [f"preprocessor({numeric!r}, {categorical!r}, dense=True)"]
+    if params.get("pca"):
+        imports.add("from sklearn.decomposition import PCA")
+        steps.append(f"PCA(n_components={min(params['pca'], len(names))!r}, random_state=0)")
+    algo_import, algo_expr = _call(make_clusterer(params))
+    imports.add(algo_import)
+    return imports, "make_pipeline(" + ", ".join(steps + [algo_expr]) + ")", list(names)
+
+
 def render_pipeline(spec: dict) -> str:
     if spec["kind"] == "model":
         imports, expr, used = _member(spec["params"], spec)
     elif spec["kind"] == "ensemble":
         imports, expr, used = _ensemble(spec)
+    elif spec["kind"] == "cluster":
+        imports, expr, used = _cluster(spec)
+        return _module_text(spec, imports, expr, used, "ALGO = " + repr(spec["params"]["algo"]) + "\n")
     else:
         raise ValueError(f"unknown spec kind {spec['kind']!r}")
     return _module_text(spec, imports, expr, used)
@@ -201,14 +219,110 @@ if __name__ == "__main__":
 '''
 
 
+CLUSTER_TRAIN_PY = '''"""Fit the clustering: python src/train.py (from the project root). Written by BeyondML."""
+import json
+import os
+import sys
+from pathlib import Path
+
+import joblib
+import numpy as np
+import pandas as pd
+from sklearn.metrics import silhouette_score
+from sklearn.neighbors import KNeighborsClassifier
+
+SRC = Path(__file__).resolve().parent
+ROOT = SRC.parent
+sys.path.insert(0, str(SRC))
+from pipeline import ALGO, DATA, FEATURES, build_pipeline  # noqa: E402
+
+
+def prepare(df):
+    if (SRC / "clean.py").exists():
+        from clean import clean
+        df = clean(df)
+    if (SRC / "features.py").exists():
+        from features import make_features
+        df = make_features(df)
+    return df
+
+
+def main():
+    df = prepare(pd.read_csv(ROOT / DATA))
+    X = df[FEATURES]
+    model = build_pipeline()
+    labels = np.asarray(model.fit_predict(X))
+    Z = np.asarray(model[:-1].transform(X))
+    keep = labels != -1
+    n_clusters = len(set(labels.tolist()) - {-1})
+    assigner = None
+    if ALGO == "dbscan" and keep.any():  # DBSCAN cannot predict: new rows join their nearest core point's cluster
+        assigner = KNeighborsClassifier(n_neighbors=1).fit(Z[keep], labels[keep])
+    (ROOT / "models").mkdir(exist_ok=True)
+    joblib.dump({"pipeline": model, "assigner": assigner}, ROOT / "models" / "model.joblib")
+    (ROOT / "data" / "processed").mkdir(parents=True, exist_ok=True)
+    df.assign(cluster=labels).to_csv(ROOT / "data" / "processed" / "clusters.csv", index=False)
+    score = -1.0
+    if n_clusters >= 2 and keep.sum() > n_clusters:
+        score = float(silhouette_score(Z[keep], labels[keep], sample_size=min(2000, int(keep.sum())), random_state=0))
+    metrics = {"silhouette": score, "n_clusters": n_clusters, "noise_pct": float(np.mean(~keep))}
+    Path(os.environ.get("BEYONDML_METRICS", "metrics.json")).write_text(json.dumps(metrics))
+    print(json.dumps(metrics))
+
+
+if __name__ == "__main__":
+    main()
+'''
+
+CLUSTER_PREDICT_PY = '''"""Assign clusters to new rows: python src/predict.py INPUT.csv [OUTPUT.csv]. Written by BeyondML."""
+import sys
+from pathlib import Path
+
+import joblib
+import pandas as pd
+
+SRC = Path(__file__).resolve().parent
+ROOT = SRC.parent
+sys.path.insert(0, str(SRC))
+from pipeline import FEATURES, REQUIRED  # noqa: E402
+from train import prepare  # noqa: E402
+
+
+def main(argv):
+    if not argv:
+        print("usage: python src/predict.py INPUT.csv [OUTPUT.csv]", file=sys.stderr)
+        return 2
+    df = prepare(pd.read_csv(argv[0]))
+    missing = [c for c in REQUIRED if c not in df.columns]
+    if missing:
+        print("missing columns: " + ", ".join(missing), file=sys.stderr)
+        return 2
+    bundle = joblib.load(ROOT / "models" / "model.joblib")
+    model, assigner = bundle["pipeline"], bundle["assigner"]
+    X = df[FEATURES]
+    labels = assigner.predict(model[:-1].transform(X)) if assigner is not None else model.predict(X)
+    target = argv[1] if len(argv) > 1 else "clusters_new.csv"
+    df.assign(cluster=labels).to_csv(target, index=False)
+    print(f"wrote {len(df)} cluster labels to {target}")
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv[1:]))
+'''
+
+
 def write_project_code(root: Path, spec: dict) -> list[str]:
     src = Path(root) / "src"
     src.mkdir(parents=True, exist_ok=True)
-    files = {"src/pipeline.py": render_pipeline(spec), "src/train.py": TRAIN_PY, "src/predict.py": PREDICT_PY}
+    cluster = spec["kind"] == "cluster"
+    files = {"src/pipeline.py": render_pipeline(spec), "src/train.py": CLUSTER_TRAIN_PY if cluster else TRAIN_PY,
+             "src/predict.py": CLUSTER_PREDICT_PY if cluster else PREDICT_PY}
     for rel, text in files.items():
         (Path(root) / rel).write_text(text, encoding="utf-8")
     written = list(files)
-    models = [spec["params"]["model"]] if spec["kind"] == "model" else [m["model"] for m in spec.get("members", [])]
+    models = ([spec["params"]["model"]] if spec["kind"] == "model"
+              else [m["model"] for m in spec.get("members", [])])
     if "MLP" in models:
         shutil.copyfile(Path(__file__).with_name("mlp.py"), src / "mlp.py")
         written.append("src/mlp.py")
