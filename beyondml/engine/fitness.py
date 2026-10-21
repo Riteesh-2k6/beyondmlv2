@@ -83,8 +83,16 @@ def warm_seeds(problem_type: str, n_features: int, models: Sequence[str] | None 
     return [{"model": n, **_MODEL_TABLE[n][2], "features": (1,) * n_features} for n in _usable(problem_type, models)]
 
 
+# Folds of one CV run on joblib's loky process pool, which outlives the call (v1 leaned on the same pool).
+# The size is FIXED: loky kills and respawns its workers whenever n_jobs changes between calls, which
+# measured slower than serial. Five is the top rung's fold count.
+CV_POOL = 5
+SCREEN_EFFORT = 0.2   # the screening rung fits ensembles with this fraction of their trees
+
+
 def default_ladder(n_rows: int) -> tuple[Fidelity, ...]:
-    return (Fidelity(1.0, 3), Fidelity(1.0, 5)) if n_rows < 5000 else (Fidelity(0.25, 3), Fidelity(1.0, 5))
+    return ((Fidelity(1.0, 3, SCREEN_EFFORT), Fidelity(1.0, 5)) if n_rows < 5000
+            else (Fidelity(0.25, 3, SCREEN_EFFORT), Fidelity(1.0, 5)))
 
 
 def _make_model(name: str, classification: bool, hp: dict, class_weight):
@@ -112,8 +120,10 @@ class TabularFitness:
     """v1's penalised CV score for one params dict at one Fidelity. Picklable; safe to call from threads
     (it only reads shared state and builds a fresh pipeline per call)."""
 
-    def __init__(self, X: pd.DataFrame, y: pd.Series, problem_type: str, profile: dict) -> None:
+    def __init__(self, X: pd.DataFrame, y: pd.Series, problem_type: str, profile: dict,
+                 cv_jobs: int = CV_POOL) -> None:
         self.X, self.y = X, y
+        self.cv_jobs = cv_jobs
         self.classification = problem_type == "classification"
         counts = y.value_counts() if self.classification else None
         self.n_classes, self.min_class = (len(counts), int(counts.min())) if self.classification else (0, 0)
@@ -139,7 +149,10 @@ class TabularFitness:
     def __call__(self, params: dict, fidelity: Fidelity) -> tuple[float, dict]:
         hp = {k: v for k, v in params.items() if k not in ("model", "features")}
         name = params["model"]
-        model = _make_model(name, self.classification, hp, self.class_weight)
+        fit_hp = hp
+        if fidelity.effort < 1 and "n_estimators" in hp:   # a low rung screens with fewer trees
+            fit_hp = dict(hp, n_estimators=max(10, round(hp["n_estimators"] * fidelity.effort)))
+        model = _make_model(name, self.classification, fit_hp, self.class_weight)
 
         picked = [i for i, bit in enumerate(params["features"]) if bit]
         selected = [self.names[i] for i in picked]
@@ -162,7 +175,7 @@ class TabularFitness:
         cv = cv_cls(n_splits=n_splits, shuffle=True, random_state=0)
 
         res = cross_validate(pipe, X, y, cv=cv, scoring="accuracy" if self.classification else "r2",
-                             return_train_score=True, error_score="raise")
+                             return_train_score=True, error_score="raise", n_jobs=self.cv_jobs)
         mu_cv = float(np.mean(res["test_score"]))
         sigma_cv = float(np.std(res["test_score"]))
         gap = float(max(0.0, np.mean(res["train_score"]) - mu_cv))
@@ -186,8 +199,10 @@ def evolve_tabular(df: pd.DataFrame, target: str, profile: dict, *, models: Sequ
                    seeds: Sequence[dict] = (), on_generation=None, seed: int = 0) -> EvolveResult:
     problem_type = profile["target_analysis"]["target_type"]
     X, y = df.drop(columns=[target]), df[target]
-    return evolve(tabular_space(problem_type, X.shape[1], models), TabularFitness(X, y, problem_type, profile),
+    big = len(df) >= 20_000   # candidates then run in processes, where each worker would start its own loky pool
+    return evolve(tabular_space(problem_type, X.shape[1], models),
+                  TabularFitness(X, y, problem_type, profile, cv_jobs=1 if big else CV_POOL),
                   pop_size=pop_size, budget=budget, workers=workers,
-                  executor="processes" if len(df) >= 20_000 else "threads", fidelity=default_ladder(len(df)),
+                  executor="processes" if big else "threads", fidelity=default_ladder(len(df)),
                   seeds=list(seeds) + warm_seeds(problem_type, X.shape[1], models),
                   on_generation=on_generation, seed=seed)

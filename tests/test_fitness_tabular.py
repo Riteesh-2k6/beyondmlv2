@@ -121,13 +121,15 @@ def test_warm_seed_evaluated_first_gen(classification_df, classification_profile
 
 def test_executor_by_rows(monkeypatch):
     seen = []
-    monkeypatch.setattr(fitness_mod, "evolve", lambda *a, **kw: seen.append(kw))
+    monkeypatch.setattr(fitness_mod, "evolve", lambda *a, **kw: seen.append((a, kw)))
     profile = _binary_profile()
     for n in (200, 20_000):
         df = pd.DataFrame({"x": np.arange(n, dtype=float), "target": np.arange(n) % 2})
         evolve_tabular(df, "target", profile)
-    assert [kw["executor"] for kw in seen] == ["threads", "processes"]
-    assert seen[0]["fidelity"] == default_ladder(200) and seen[1]["fidelity"] == default_ladder(20_000)
+    assert [kw["executor"] for _, kw in seen] == ["threads", "processes"]
+    assert seen[0][1]["fidelity"] == default_ladder(200) and seen[1][1]["fidelity"] == default_ladder(20_000)
+    # a process-pool worker would start its own loky pool, so big frames run their folds serially
+    assert [a[1].cv_jobs for a, _ in seen] == [fitness_mod.CV_POOL, 1]
 
 
 def test_space_rejects_wrong_problem_type():
@@ -150,8 +152,36 @@ def test_models_filter_keeps_given_order_and_fitting_models():
 
 
 def test_default_ladder():
-    assert default_ladder(4_999) == (Fidelity(1.0, 3), Fidelity(1.0, 5))
-    assert default_ladder(5_000) == (Fidelity(0.25, 3), Fidelity(1.0, 5))
+    assert default_ladder(4_999) == (Fidelity(1.0, 3, 0.2), Fidelity(1.0, 5))
+    assert default_ladder(5_000) == (Fidelity(0.25, 3, 0.2), Fidelity(1.0, 5))
+
+
+def test_screen_effort_caps_trees(monkeypatch, classification_df, classification_profile):
+    seen = []
+    real = fitness_mod._make_model
+    monkeypatch.setattr(fitness_mod, "_make_model",
+                        lambda name, c, hp, w: seen.append(hp.get("n_estimators")) or real(name, c, hp, w))
+    X, y = _split(classification_df)
+    fit = TabularFitness(X, y, "classification", classification_profile)
+    seed = warm_seeds("classification", X.shape[1], models=("RandomForest",))[0]   # 100 trees
+    full = fit(seed, Fidelity(1.0, 3))[1]
+    screen = fit(seed, Fidelity(1.0, 3, effort=0.2))[1]
+    fit(dict(seed, n_estimators=50), Fidelity(1.0, 3, effort=0.1))
+    assert seen == [100, 20, 10]   # never below 10 trees
+    assert screen["complexity"] == full["complexity"]   # the penalty still charges the full forest
+
+
+def test_cv_pool_size_is_fixed(monkeypatch, classification_df, classification_profile):
+    seen = []
+    real = fitness_mod.cross_validate
+    monkeypatch.setattr(fitness_mod, "cross_validate", lambda *a, **kw: seen.append(kw["n_jobs"]) or real(*a, **kw))
+    X, y = _split(classification_df)
+    fit = TabularFitness(X, y, "classification", classification_profile)
+    seed = warm_seeds("classification", X.shape[1], models=("DecisionTree",))[0]
+    fit(seed, Fidelity(folds=3))
+    fit(seed, Fidelity(folds=5))
+    TabularFitness(X, y, "classification", classification_profile, cv_jobs=1)(seed, Fidelity(folds=3))
+    assert seen == [fitness_mod.CV_POOL, fitness_mod.CV_POOL, 1] and fitness_mod.CV_POOL == 5
 
 
 def test_fitness_lets_errors_propagate(classification_df, classification_profile):

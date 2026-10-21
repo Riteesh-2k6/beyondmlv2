@@ -209,6 +209,7 @@ def freeze(params: dict) -> tuple:
 class Fidelity:
     rows: float = 1.0
     folds: int = 5
+    effort: float = 1.0   # fraction of the model's iterative budget (trees, boosting rounds, epochs)
 
 
 @dataclass(frozen=True)

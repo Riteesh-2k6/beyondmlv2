@@ -24,7 +24,7 @@
 - **Prerequisite:** `main` contains the commit `chore: health pass and harness spec`.
 - **Branch and commits:** work on branch `harness/evolve-v2`, commit after every task, never push.
 - **Dependencies:** add no new required dependency. Optuna and cmaes go only under `[project.optional-dependencies] optuna`.
-- **Parallelism:** fitness models are built with `n_jobs=1`. The population pool is the only place work runs in parallel.
+- **Parallelism:** fitness models are built with `n_jobs=1`. Work runs in parallel in the population pool and, for the tabular fitness, in a fixed-size joblib (loky) pool over the folds (`CV_POOL = 5`); inside the process-pool path the folds run serially so pools never nest.
 - **Spec values:**
   - promotion fraction 0.3
   - `plateau_generations` default 3
@@ -33,7 +33,7 @@
   - elitism `max(1, int(0.1 * pop_size))`
   - tournament size `max(2, min(3, pop_size // 5))`
   - mutation rate 0.15
-- **Speed target:** on the latency frame with RandomForest only, `pop_size=5` and 3 generations, the run takes ≤5.0 s of wall time including pool start. v1 measured 15.9 s cold and 9.9 s warm on the 16-core dev machine.
+- **Speed target** (re-stated 2026-10-21 with the owner): on the latency frame with RandomForest only, `pop_size=5` and 3 generations, the warm run (second in the same process) takes ≤5.0 s and the cold run no longer than v1's recorded cold time. v1 measured 15.6 s cold and 9.4 s warm on the 16-core dev machine (`tests/data/evolve_v1_baseline.json`).
 - **Quality target:** over seeds 0, 1 and 2 on the quality frame, mean best `mu_cv` is ≥ v1's recorded mean − 0.01.
 
 ## Review Focus
@@ -331,7 +331,8 @@ for gen in 1..budget.max_generations:
   def warm_seeds(problem_type: str, n_features: int, models: Sequence[str] | None = None) -> list[dict]
       # v1's warm-start defaults for each model, with every feature on
   def default_ladder(n_rows: int) -> tuple[Fidelity, ...]
-      # n_rows < 5000: (Fidelity(1.0, 3), Fidelity(1.0, 5)); otherwise (Fidelity(0.25, 3), Fidelity(1.0, 5))
+      # n_rows < 5000: (Fidelity(1.0, 3, effort=0.2), Fidelity(1.0, 5)); otherwise (Fidelity(0.25, 3, effort=0.2), Fidelity(1.0, 5))
+      # effort < 1 fits ensembles with that fraction of their trees (at least 10); the penalty still charges the full count
 
   class TabularFitness:   # picklable
       def __init__(self, X: pd.DataFrame, y: pd.Series, problem_type: str, profile: dict) -> None
@@ -429,10 +430,9 @@ for gen in 1..budget.max_generations:
 
   ```python
   def test_latency_frame_speed():
-      # profile = DatasetProfiler(latency_frame(), target_column="target").run()
-      # t = perf_counter(); evolve_tabular(df, "target", profile, models=("RandomForest",), pop_size=5,
-      #                                    budget=Budget(max_generations=3, plateau_generations=99), seed=0)
-      assert perf_counter() - t <= 5.0
+      # run `scripts/bench_evolve.py --engine v2 --dataset latency` in a fresh subprocess (so "cold" is cold)
+      # and read its JSON; baseline = tests/data/evolve_v1_baseline.json
+      assert speed["warm_s"] <= 5.0 and speed["cold_s"] <= baseline["speed"]["cold_s"]
 
   def test_quality_not_worse_than_v1():
       # baseline = json.load(open("tests/data/evolve_v1_baseline.json"))
