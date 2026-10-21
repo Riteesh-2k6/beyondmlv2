@@ -67,19 +67,19 @@ function Shell() {
     <SessionContext value={session}>
       <div className="flex h-full flex-col">
         <header className="flex h-10 shrink-0 items-center gap-3 border-b border-border-sub bg-surface px-3">
-          <NavLink to="/" className="text-sm font-medium text-orange hover:text-orange/80" title="all projects">BeyondML</NavLink>
-          <span className="font-mono text-sm text-fg">{name}</span>
+          <NavLink to="/" className="hidden text-sm font-medium text-orange hover:text-orange/80 sm:block" title="all projects">BeyondML</NavLink>
+          <span className="shrink-0 whitespace-nowrap font-mono text-sm text-fg">{name}</span>
           {summary?.goal && <span className="hidden min-w-0 truncate text-sm text-muted md:block" style={{ maxWidth: '28rem' }}>{summary.goal}</span>}
-          <nav aria-label="screens" className="ml-2 flex items-center gap-0.5">
+          <nav aria-label="screens" className="flex min-w-0 items-center gap-0.5 overflow-x-auto sm:ml-2">
             {NAV.map((n) => (
               <NavLink
                 key={n.to}
                 to={`/p/${encodeURIComponent(name)}/${n.to}`}
                 end={n.end}
-                className={({ isActive }) => clsx('flex h-7 items-center gap-1.5 rounded-[2px] px-2 text-xs transition-colors duration-150',
+                className={({ isActive }) => clsx('flex h-7 shrink-0 items-center gap-1.5 rounded-[2px] px-2 text-xs transition-colors duration-150',
                   isActive ? 'bg-obsidian text-orange' : 'text-muted hover:text-fg')}
               >
-                {n.label}<Key>{n.key}</Key>
+                {n.label}<span className="hidden sm:inline"><Key>{n.key}</Key></span>
               </NavLink>
             ))}
           </nav>

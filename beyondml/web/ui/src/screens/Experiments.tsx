@@ -95,7 +95,7 @@ function FragmentRow({ record: r, failed, expanded, onToggle, onAgent }: {
         <td className="px-3 py-1.5 text-right tabular-nums text-fg/90">{(r.seconds ?? 0).toFixed(1)}</td>
         <td className="px-3 py-1.5">
           <div className="flex flex-wrap gap-1">
-            {metrics.length ? metrics.map(([k, v]) => <Chip key={k} tone="accent">{k}={fmt(v)}</Chip>) : <span className="text-muted">—</span>}
+            {metrics.length ? metrics.map(([k, v]) => <Chip key={k}>{k}=<span className="text-fg">{fmt(v)}</span></Chip>) : <span className="text-muted">—</span>}
           </div>
         </td>
       </tr>

@@ -125,7 +125,7 @@ export function Agent() {
               <dt className="text-muted">skill</dt><dd className="font-mono">{info?.skill ?? '—'}</dd>
               <dt className="text-muted">inputs</dt><dd className="flex flex-wrap gap-1">{info?.inputs.length ? info.inputs.map((i) => <Chip key={i}>{i}</Chip>) : '—'}</dd>
               <dt className="text-muted">outputs</dt><dd className="flex flex-wrap gap-1">{info?.outputs.length ? info.outputs.map((o) => <Chip key={o}>{o}</Chip>) : '—'}</dd>
-              <dt className="text-muted">tools</dt><dd className="flex flex-wrap gap-1">{info?.tools.length ? info.tools.map((t) => <Chip key={t} tone="accent">{t}</Chip>) : '—'}</dd>
+              <dt className="text-muted">tools</dt><dd className="flex flex-wrap gap-1">{info?.tools.length ? info.tools.map((t) => <Chip key={t} className="text-fg">{t}</Chip>) : '—'}</dd>
             </dl>
             {info?.instruction ? (
               <pre className="whitespace-pre-wrap break-words px-3 py-3 font-mono text-xs leading-5 text-fg/90">{info.instruction}</pre>

@@ -53,7 +53,7 @@ export function EvolveView({ generations, trials }: { generations: Generation[];
           />
           <Plot
             height={160}
-            data={[{ x: generations.map((g) => g.gen), y: generations.map((g) => g.diversity), type: 'bar', marker: { color: SERIES[1] }, name: 'diversity' }] as Data[]}
+            data={[{ x: generations.map((g) => g.gen), y: generations.map((g) => g.diversity), type: 'bar', marker: { color: 'rgba(34,211,238,0.45)', line: { color: SERIES[1], width: 1 } }, name: 'diversity' }] as Data[]}
             layout={{ title: { text: 'population diversity', font: { size: 12, color: '#E4E4E7' }, x: 0 }, xaxis: { dtick: 1 }, yaxis: { range: [0, 1.05] }, showlegend: false }}
           />
           <div>

@@ -24,11 +24,20 @@ const BASE_LAYOUT: Partial<Layout> = {
 }
 
 export function Plot({ data, layout, height = 260 }: { data: Data[]; layout?: Partial<Layout>; height?: number }) {
+  // axes merge, so a caller's dtick or title keeps the palette's grid and line colours
+  const merged: Partial<Layout> = {
+    ...BASE_LAYOUT,
+    ...layout,
+    xaxis: { ...BASE_LAYOUT.xaxis, ...layout?.xaxis },
+    yaxis: { ...BASE_LAYOUT.yaxis, ...layout?.yaxis },
+    height,
+    autosize: true,
+  }
   return (
     <Suspense fallback={<div className="skeleton" style={{ height }} aria-busy="true" />}>
       <LazyPlot
         data={data}
-        layout={{ ...BASE_LAYOUT, ...layout, height, autosize: true }}
+        layout={merged}
         config={{ displayModeBar: false, responsive: true }}
         useResizeHandler
         style={{ width: '100%', height }}

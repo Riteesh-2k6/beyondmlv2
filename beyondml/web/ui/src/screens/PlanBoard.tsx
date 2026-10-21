@@ -72,7 +72,7 @@ function RunForm({ onStarted, resumable }: { onStarted: () => void; resumable: b
           <input id="upload" type="file" onChange={(e) => void upload(e.target.files?.[0])} disabled={busy}
             className="block w-full text-xs text-muted file:mr-2 file:h-7 file:rounded-[2px] file:border file:border-border-sub file:bg-surface file:px-2 file:text-xs file:text-fg hover:file:border-muted" />
           {uploaded.length > 0 && (
-            <div className="mt-1.5 flex flex-wrap gap-1">{uploaded.map((p) => <Chip key={p} tone="accent">{p}</Chip>)}</div>
+            <div className="mt-1.5 flex flex-wrap gap-1">{uploaded.map((p) => <Chip key={p} className="text-fg">{p}</Chip>)}</div>
           )}
         </div>
         <div>

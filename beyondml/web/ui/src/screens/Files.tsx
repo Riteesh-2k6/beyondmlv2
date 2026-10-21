@@ -6,7 +6,7 @@ import { api, type FileEntry } from '../api'
 import { Empty, PanelTitle } from '../components/ui'
 import { useProject } from '../context'
 
-const HIDDEN = new Set(['.git', '__pycache__'])
+const HIDDEN = new Set(['.git', '.beyondml', '__pycache__'])
 const MAX_PREVIEW = 200_000
 
 function parseCsv(text: string, maxRows: number): string[][] {

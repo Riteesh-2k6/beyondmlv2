@@ -56,8 +56,9 @@ export function DepGraph({ steps, onOpen, active }: { steps: Step[]; onOpen: (id
   return (
     <svg
       viewBox={`0 0 ${width} ${height}`}
-      className="h-auto w-full max-w-full"
-      style={{ maxHeight: 520 }}
+      width={width}
+      height={height}
+      className="h-auto max-w-full"
       preserveAspectRatio="xMinYMin meet"
       role="img"
       aria-label="dependency graph"
