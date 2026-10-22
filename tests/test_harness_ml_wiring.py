@@ -92,3 +92,29 @@ def test_litellm_tool_calls_can_import_mcp():
     # litellm>=1.106 imports its MCP gateway handler on every tool-carrying call but does not declare `mcp`;
     # without it every real agent turn fails with APIConnectionError("No module named 'mcp'").
     import litellm.responses.mcp.chat_completions_handler  # noqa: F401
+
+
+async def test_groq_drops_replayed_reasoning(tmp_path, monkeypatch):
+    # Groq rejects `reasoning_content` on assistant history turns, which ADK builds from a reasoning model's thought
+    # parts (gpt-oss-120b failed its first retry with BadRequestError "property 'reasoning_content' is unsupported").
+    from google.adk.models.lite_llm import LiteLlm
+    from google.adk.models.llm_request import LlmRequest
+    from google.genai import types
+
+    from beyondml.harness.adk import default_resolver
+
+    sent = []
+
+    async def capture(self, llm_request, stream=False):
+        sent.append(llm_request.contents)
+        yield None
+
+    monkeypatch.setattr(LiteLlm, "generate_content_async", capture)
+    turn = types.Content(role="model", parts=[types.Part(text="thinking", thought=True),
+                                              types.Part(function_call=types.FunctionCall(name="f", args={}))])
+    only_thought = types.Content(role="model", parts=[types.Part(text="hmm", thought=True)])
+    request = LlmRequest(contents=[types.Content(role="user", parts=[types.Part(text="hi")]), turn, only_thought])
+    model = default_resolver(Project.init(tmp_path))("planner", "groq/openai/gpt-oss-120b")
+    [_ async for _ in model.generate_content_async(request)]
+    assert [[p.thought for p in c.parts] for c in sent[0]] == [[None], [None]]
+    assert turn.parts[0].thought  # the session's own event is not mutated

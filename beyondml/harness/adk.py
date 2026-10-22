@@ -30,9 +30,30 @@ def default_resolver(project: Project) -> ModelResolver:
 
         if name.startswith("ollama"):
             return LiteLlm(model=name, api_base=cfg["api_base"], num_retries=3)
+        if name.startswith("groq/"):
+            return _groq_llm(name)
         return LiteLlm(model=name, num_retries=3)
 
     return resolve
+
+
+def _groq_llm(name: str):
+    from google.adk.models.lite_llm import LiteLlm
+
+    class GroqLlm(LiteLlm):
+        """Groq rejects `reasoning_content` on assistant history turns, which ADK replays from thought parts."""
+
+        async def generate_content_async(self, llm_request, stream=False):
+            contents = []
+            for content in llm_request.contents:
+                parts = [p for p in content.parts or [] if not p.thought]
+                if parts:
+                    contents.append(content.model_copy(update={"parts": parts}))
+            async for response in super().generate_content_async(
+                    llm_request.model_copy(update={"contents": contents}), stream):
+                yield response
+
+    return GroqLlm(model=name, num_retries=3)
 
 
 def session_service(project: Project) -> SqliteSessionService:
