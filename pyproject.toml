@@ -39,6 +39,7 @@ dependencies = [
     "google-adk==2.12.0",
     "litellm>=1.106",
     "mcp>=2.3",  # litellm imports it on every tool call but does not declare it
+    "pyarrow>=15",  # parquet: intake, the tools and the planner's example plan all use it
 ]
 
 [project.optional-dependencies]

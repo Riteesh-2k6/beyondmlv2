@@ -62,6 +62,11 @@ async def test_drift_tool(env, classification_df):
     assert result["ok"] and "income" in result["drifted"]
 
 
+async def test_tools_read_parquet(env, classification_df):
+    # the planner's example plan and intake use .parquet; without pyarrow every to_parquet/read failed (acceptance 10-22)
+    classification_df.to_parquet(env.project.root / "data" / "raw" / "t.parquet", index=False)
+    assert tools(env)["profile"]("data/raw/t.parquet", target="target")["rows"] == 200
+
 async def test_chart_tool(env):
     result = tools(env)["chart"]("hist", "data/raw/t.csv", "age", title="Age spread")
     assert result["ok"]
