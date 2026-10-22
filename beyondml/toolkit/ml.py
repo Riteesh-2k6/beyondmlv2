@@ -235,7 +235,7 @@ def ml_tools(env: ToolEnv) -> list[Callable]:
         return _jsonable({"ok": True, "columns": result, "drifted": drifted})
 
     @_safe
-    def chart(kind: str, data: str, x: str, y: str = "", title: str = "") -> dict:
+    def chart(kind: str, data: str, x: str = "", y: str = "", title: str = "") -> dict:
         """Draw a chart into reports/charts/ and show it on the agent's screen.
 
         Args:

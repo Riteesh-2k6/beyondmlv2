@@ -1,3 +1,4 @@
+import inspect
 import json
 
 import numpy as np
@@ -68,6 +69,12 @@ async def test_chart_tool(env):
     assert "data" in figure and result["path"].startswith("reports/charts/")
     assert events(env, "chart") == [{"title": "Age spread", "path": result["path"]}]
 
+
+async def test_chart_corr_needs_no_x(env):
+    # Groq validates calls against the declared schema; a required x bounced a valid corr call (acceptance 10-22)
+    chart = tools(env)["chart"]
+    assert inspect.signature(chart).parameters["x"].default == ""
+    assert chart("corr", "data/raw/t.csv")["ok"]
 
 async def test_tools_refuse_escapes(env):
     t = tools(env)
