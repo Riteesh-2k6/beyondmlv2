@@ -408,8 +408,9 @@ def ml_tools(env: ToolEnv) -> list[Callable]:
     @_safe_async
     async def evaluate(data: str, target: str, pipeline: str = "src/pipeline.py", test_size: float = 0.2,
                        seed: int = 0) -> dict:
-        """Hold out a test split, fit the pipeline, and report score, train/test gap, importance and health
-        (health 0 when the gap > 0.10, one feature carries > 50% of the importance, or the score >= 0.999).
+        """Hold out a test split, fit the pipeline, and report score, train/test gap, importance and health.
+        health is 0 only for a near-perfect score (>= 0.999, likely leakage); a gap > 0.10 or one feature carrying
+        > 50% of the importance come back as warnings to explain.
 
         Args:
             data: Project-relative CSV/Parquet with the features and the target.

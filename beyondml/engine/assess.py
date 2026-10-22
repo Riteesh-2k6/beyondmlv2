@@ -54,17 +54,18 @@ def assess(estimator_factory: Callable[[], Any], X: pd.DataFrame, y: pd.Series, 
     train_score, score = float(model.score(X_train, y_train)), float(model.score(X_test, y_test))
     gap = max(0.0, train_score - score)
     imp = importance(model, X_test, y_test, seed=seed)
-    reasons = []
+    # Owner decision 2026-10-22: only a near-perfect score (likely leakage) fails health. A large train/test gap or
+    # one dominant feature are warnings to explain: a strong legitimate feature (titanic's gender) must not be cut.
+    reasons = ["score"] if score >= HEALTH["max_score"] else []
+    warnings = []
     if gap > HEALTH["max_gap"]:
-        reasons.append("gap")
+        warnings.append("gap")
     if imp["top_share"] > HEALTH["max_top_share"]:
-        reasons.append("top_share")
-    if score >= HEALTH["max_score"]:
-        reasons.append("score")
+        warnings.append("top_share")
     confusion = []
     if classification:
         labels = sorted(pd.unique(pd.concat([y_train, y_test])), key=str)
         confusion = confusion_matrix(y_test, model.predict(X_test), labels=labels).tolist()
     return {"score_name": "accuracy" if classification else "r2", "score": score, "train_score": train_score,
             "gap": gap, "top_share": imp["top_share"], "confusion": confusion, "importance": imp,
-            "health": 0 if reasons else 1, "health_reasons": reasons}
+            "health": 0 if reasons else 1, "health_reasons": reasons, "warnings": warnings}

@@ -10,7 +10,7 @@ metadata:
 You judge whether the model is trustworthy.
 
 1. Call explain(data="data/processed/features.csv", target=<the target>).
-2. Call evaluate(data="data/processed/features.csv", target=<the target>). health is 0 when the train/test gap is over 0.10, one feature carries over half the importance, or the score is 0.999 or more (likely leakage).
-3. Write reports/evaluation.md: score, gap, top features, health and its reasons, and what you would change.
-4. If health is 0, call finish_step with the reasons stated plainly so the re-plan can fix them (drop the dominant or leaking feature, constrain the model). Otherwise summarise the result.
+2. Call evaluate(data="data/processed/features.csv", target=<the target>). health is 0 only when the score is 0.999 or more (likely leakage). warnings lists a train/test gap over 0.10 ("gap") or one feature carrying over half the importance ("top_share").
+3. Write reports/evaluation.md: score, gap, top features, health, and one line per warning explaining it. A dominant feature can be legitimate (gender on titanic); say whether you think it is, and never drop a legitimate feature just to spread importance.
+4. If health is 0, call finish_step with the reason stated plainly so the re-plan can remove the leak. Otherwise summarise the result and the warnings.
 5. outputs=["reports/evaluation.md"].

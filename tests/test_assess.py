@@ -19,23 +19,24 @@ def test_assess_healthy():
     X, rng = _frame()
     y = (X.sum(axis=1) + rng.normal(scale=0.5, size=len(X)) > 0).astype(int)   # signal spread over four features
     result = assess(lambda: LogisticRegression(max_iter=1000), X, y, classification=True)
-    assert result["health"] == 1 and result["health_reasons"] == []
+    assert result["health"] == 1 and result["health_reasons"] == [] and result["warnings"] == []
     assert result["score_name"] == "accuracy" and len(result["confusion"]) == 2
 
 
-def test_assess_flags_overfit():
+def test_assess_warns_overfit_without_failing():
+    # owner decision 2026-10-22: only likely leakage fails health; a large gap is a warning to explain
     X, rng = _frame()
     y = pd.Series(rng.randint(0, 2, len(X)))
     result = assess(lambda: DecisionTreeClassifier(random_state=0), X, y, classification=True)
-    assert result["gap"] > 0.10 and result["health"] == 0 and "gap" in result["health_reasons"]
+    assert result["gap"] > 0.10 and "gap" in result["warnings"] and result["health"] == 1
 
 
-def test_assess_flags_dominance():
+def test_assess_warns_dominance_without_failing():
     X, rng = _frame()
     y = (X["a"] > 0).astype(int)
     X = X.assign(a=X["a"] + rng.normal(scale=0.3, size=len(X)))
     result = assess(lambda: LogisticRegression(max_iter=1000), X, y, classification=True)
-    assert result["top_share"] > 0.5 and "top_share" in result["health_reasons"]
+    assert result["top_share"] > 0.5 and "top_share" in result["warnings"] and result["health"] == 1
 
 
 def test_assess_flags_perfect_score():
@@ -43,7 +44,7 @@ def test_assess_flags_perfect_score():
     y = (X["b"] > 0).astype(int)
     X = X.assign(leak=y)
     result = assess(lambda: RandomForestClassifier(random_state=0), X, y, classification=True)
-    assert result["score"] >= 0.999 and "score" in result["health_reasons"]
+    assert result["score"] >= 0.999 and result["health_reasons"] == ["score"] and result["health"] == 0
 
 
 def test_evaluate_tiny_imbalanced():
