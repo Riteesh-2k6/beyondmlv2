@@ -1,6 +1,6 @@
 ---
 name: tabular-cluster
-description: "Groups rows when there is no target: evolves KMeans/DBSCAN for the best silhouette and exports the code. Only when the data has no target."
+description: "Groups rows when there is no target: evolves KMeans/DBSCAN for the best silhouette and exports the code. Only when the data has no target. Check: expects data/processed/clusters.csv."
 allowed-tools: read_file list_files write_file run_python profile cluster chart export_pipeline finish_step
 metadata:
   beyondml:

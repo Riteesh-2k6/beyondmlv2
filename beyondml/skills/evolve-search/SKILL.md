@@ -1,6 +1,6 @@
 ---
 name: evolve-search
-description: "Searches models and hyperparameters with the genetic algorithm (or Optuna for expensive models). Usually right after tabular-features."
+description: "Searches models and hyperparameters with the genetic algorithm (or Optuna for expensive models). Usually right after tabular-features. Check: metric mu_cv with a minimum."
 allowed-tools: read_file list_files profile evolve tune finish_step
 metadata:
   beyondml:

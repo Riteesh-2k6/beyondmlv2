@@ -1,6 +1,6 @@
 ---
 name: tabular-ensemble
-description: "Combines the search's top models into a stacking ensemble. Only when the top genomes are within about 1% of each other."
+description: "Combines the search's top models into a stacking ensemble. Only when the top genomes are within about 1% of each other. Check: metric cv_score with a minimum."
 allowed-tools: read_file ensemble finish_step
 metadata:
   beyondml:

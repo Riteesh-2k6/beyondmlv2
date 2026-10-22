@@ -1,6 +1,6 @@
 ---
 name: evaluate-explain
-description: "Holds out data, checks for overfitting, dominance and leakage (health), and explains the model. Usually the last step of a supervised plan."
+description: "Holds out data, checks for leakage (health) and warns on overfitting and dominance, and explains the model. Usually the last step of a supervised plan. Check: metric health, min 1."
 allowed-tools: read_file list_files write_file evaluate explain chart finish_step
 metadata:
   beyondml:

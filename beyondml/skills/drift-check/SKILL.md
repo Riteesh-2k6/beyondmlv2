@@ -1,6 +1,6 @@
 ---
 name: drift-check
-description: "Compares a new batch with the data the model was built on. Only when the inputs include a reference set and a newer batch."
+description: "Compares a new batch with the data the model was built on. Only when the inputs include a reference set and a newer batch. Check: expects reports/drift.md."
 allowed-tools: read_file list_files write_file drift chart finish_step
 metadata:
   beyondml:

@@ -1,6 +1,6 @@
 ---
 name: tabular-audit
-description: "First step for a table: profile it, fix the target and problem type, find leaking and impossible columns. Usually the first step of a tabular plan."
+description: "First step for a table: profile it, fix the target and problem type, find leaking and impossible columns. Usually the first step of a tabular plan. Check: expects reports/audit.md."
 allowed-tools: read_file list_files write_file run_python profile scan_leakage chart ask_user finish_step
 metadata:
   beyondml:

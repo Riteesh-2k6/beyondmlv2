@@ -1,6 +1,6 @@
 ---
 name: tabular-eda
-description: "Explores the cleaned table and writes insights for the feature step. Usually right after tabular-clean."
+description: "Explores the cleaned table and writes insights for the feature step. Usually right after tabular-clean. Check: expects reports/eda.md."
 allowed-tools: read_file list_files write_file run_python profile chart finish_step
 metadata:
   beyondml:

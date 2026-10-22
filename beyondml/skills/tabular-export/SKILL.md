@@ -1,6 +1,6 @@
 ---
 name: tabular-export
-description: "Writes the shipped code (src/pipeline.py, train.py, predict.py) from the winning run and trains it. Usually right after evolve-search or tabular-ensemble."
+description: "Writes the shipped code (src/pipeline.py, src/train.py, src/predict.py) from the winning run and trains it. Usually right after evolve-search or tabular-ensemble. Check: run src/train.py, expects models/model.joblib, metric accuracy (classification) or r2 (regression) with a minimum."
 allowed-tools: read_file list_files write_file run_python export_pipeline finish_step
 metadata:
   beyondml:

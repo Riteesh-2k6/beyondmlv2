@@ -1,6 +1,6 @@
 ---
 name: tabular-clean
-description: "Writes src/clean.py: drops audited columns, fixes impossible values, imputes and handles outliers. Usually right after tabular-audit."
+description: "Writes src/clean.py: drops audited columns, fixes impossible values, imputes and handles outliers. Usually right after tabular-audit. Check: run src/clean.py, expects data/processed/clean.csv."
 allowed-tools: read_file list_files write_file run_python profile detect_outliers ask_user finish_step
 metadata:
   beyondml:

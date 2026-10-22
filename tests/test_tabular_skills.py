@@ -46,3 +46,12 @@ def test_checkpoints_present(skills):
 def test_descriptions_state_order(skills):
     for name in STEP:
         assert "Usually" in skills[name].description or "Only when" in skills[name].description, name
+
+
+def test_descriptions_name_the_standard_check(skills):
+    # the planner sees only descriptions; qwen3:8b invented outputs (models/best_model.pkl, a root train.py) and an
+    # export metric train.py never writes (f1) until each step skill named its standard check (acceptance 10-22)
+    for name in STEP:
+        assert "Check:" in skills[name].description, name
+    export = skills["tabular-export"].description
+    assert "src/train.py" in export and " train.py" not in export and "accuracy" in export and "r2" in export

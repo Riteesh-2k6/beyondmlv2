@@ -1,6 +1,6 @@
 ---
 name: tabular-features
-description: "Writes src/features.py with derived features (ratios, logs, interactions) and no target use. Usually right after tabular-eda."
+description: "Writes src/features.py with derived features (ratios, logs, interactions) and no target use. Usually right after tabular-eda. Check: run src/features.py, expects data/processed/features.csv."
 allowed-tools: read_file list_files write_file run_python profile scan_leakage ask_user finish_step
 metadata:
   beyondml:

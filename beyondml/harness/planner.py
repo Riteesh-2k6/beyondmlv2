@@ -26,6 +26,7 @@ EXAMPLE = {
 RULES = """- Step ids are snake_case identifiers (letters, digits, underscores; start with a letter).
 - Every step names a skill from the catalogue; use python-step when nothing else fits.
 - Success checks name concrete files (expects) or a metric with a minimum.
+- When a skill's description names a Check, use it as that step's success_check (you choose the minimum).
 - No step reads an input marked unusable in DATA.md."""
 
 
