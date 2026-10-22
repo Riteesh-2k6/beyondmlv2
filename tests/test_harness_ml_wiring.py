@@ -86,3 +86,9 @@ def test_metric_lookup_by_key(tmp_path):
 
 def test_default_model_is_qwen3(tmp_path):
     assert Project.init(tmp_path).settings()["model"]["default"] == "ollama_chat/qwen3:8b"
+
+
+def test_litellm_tool_calls_can_import_mcp():
+    # litellm>=1.106 imports its MCP gateway handler on every tool-carrying call but does not declare `mcp`;
+    # without it every real agent turn fails with APIConnectionError("No module named 'mcp'").
+    import litellm.responses.mcp.chat_completions_handler  # noqa: F401
