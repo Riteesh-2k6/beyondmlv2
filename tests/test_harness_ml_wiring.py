@@ -118,3 +118,32 @@ async def test_groq_drops_replayed_reasoning(tmp_path, monkeypatch):
     [_ async for _ in model.generate_content_async(request)]
     assert [[p.thought for p in c.parts] for c in sent[0]] == [[None], [None]]
     assert turn.parts[0].thought  # the session's own event is not mutated
+
+
+async def test_hosted_models_wait_out_rate_limits(tmp_path, monkeypatch):
+    # Groq's free tier allows 8000 tokens/minute; litellm's own retries do not wait, so one 429 failed a step and
+    # then its replan, ending the whole run in 46 s. The model now sleeps for the time the provider asks for.
+    import asyncio
+
+    from google.adk.models.lite_llm import LiteLlm
+    from google.adk.models.llm_request import LlmRequest
+    from litellm.exceptions import RateLimitError
+
+    from beyondml.harness.adk import default_resolver
+
+    calls, slept = [], []
+
+    async def limited(self, llm_request, stream=False):
+        calls.append(1)
+        if len(calls) == 1:
+            raise RateLimitError("Rate limit reached ... Please try again in 1m2.5s.", "groq", "m")
+        yield "ok"
+
+    async def fake_sleep(seconds):
+        slept.append(seconds)
+
+    monkeypatch.setattr(LiteLlm, "generate_content_async", limited)
+    monkeypatch.setattr(asyncio, "sleep", fake_sleep)
+    model = default_resolver(Project.init(tmp_path))("audit", "openai/gpt-4.1")
+    assert [r async for r in model.generate_content_async(LlmRequest())] == ["ok"]
+    assert slept == [62.5]

@@ -1,6 +1,9 @@
 """Thin glue between BeyondML and Google ADK: models, sessions, and one agent turn."""
 from __future__ import annotations
 
+import asyncio
+import functools
+import re
 from dataclasses import dataclass, field
 from typing import Callable
 
@@ -26,34 +29,51 @@ def default_resolver(project: Project) -> ModelResolver:
         name = requested or cfg["default"]
         if name.startswith("gemini"):
             return name
-        from google.adk.models.lite_llm import LiteLlm  # heavy import, only when a model is built
-
         if name.startswith("ollama"):
-            return LiteLlm(model=name, api_base=cfg["api_base"], num_retries=3)
-        if name.startswith("groq/"):
-            return _groq_llm(name)
-        return LiteLlm(model=name, num_retries=3)
+            return _llm_class()(model=name, api_base=cfg["api_base"], num_retries=3)
+        return _llm_class()(model=name, num_retries=3)
 
     return resolve
 
 
-def _groq_llm(name: str):
-    from google.adk.models.lite_llm import LiteLlm
+RATE_LIMIT_WAITS = 10  # ponytail: fixed count; a daily-quota 429 still fails after ~10 min of waiting
 
-    class GroqLlm(LiteLlm):
-        """Groq rejects `reasoning_content` on assistant history turns, which ADK replays from thought parts."""
+
+def _retry_after(error) -> float:
+    """Seconds the provider asked us to wait ("try again in 1m2.5s"), else 20."""
+    match = re.search(r"try again in (?:(\d+)m)?([\d.]+)s", str(error))
+    return 60 * int(match[1] or 0) + float(match[2]) if match else 20.0
+
+
+@functools.cache
+def _llm_class():
+    from google.adk.models.lite_llm import LiteLlm  # heavy import, only when a model is built
+    from litellm.exceptions import RateLimitError
+
+    class BeyondLlm(LiteLlm):
+        """LiteLlm that waits out rate limits (litellm's own retries do not wait) and suits Groq's history rules."""
 
         async def generate_content_async(self, llm_request, stream=False):
-            contents = []
-            for content in llm_request.contents:
-                parts = [p for p in content.parts or [] if not p.thought]
-                if parts:
-                    contents.append(content.model_copy(update={"parts": parts}))
-            async for response in super().generate_content_async(
-                    llm_request.model_copy(update={"contents": contents}), stream):
-                yield response
+            if self.model.startswith("groq/"):  # Groq rejects `reasoning_content`, which ADK replays from thoughts
+                contents = []
+                for content in llm_request.contents:
+                    parts = [p for p in content.parts or [] if not p.thought]
+                    if parts:
+                        contents.append(content.model_copy(update={"parts": parts}))
+                llm_request = llm_request.model_copy(update={"contents": contents})
+            for attempt in range(RATE_LIMIT_WAITS + 1):
+                started = False
+                try:
+                    async for response in super().generate_content_async(llm_request, stream):
+                        started = True
+                        yield response
+                    return
+                except RateLimitError as error:
+                    if started or attempt == RATE_LIMIT_WAITS:
+                        raise
+                    await asyncio.sleep(_retry_after(error))
 
-    return GroqLlm(model=name, num_retries=3)
+    return BeyondLlm
 
 
 def session_service(project: Project) -> SqliteSessionService:
