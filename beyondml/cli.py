@@ -68,7 +68,9 @@ def format_event(ev: dict) -> str | None:
     elif kind == "tool_result":
         resp = data.get("response")
         failed = isinstance(resp, dict) and (resp.get("ok") is False or "error" in resp)
-        detail = (resp.get("error") or resp.get("errors")) if failed else None
+        if failed:  # a failed script has no "error": show its last stderr line, else its exit code
+            tail = (resp.get("stderr_tail") or "").strip().splitlines()
+            detail = resp.get("error") or resp.get("errors") or (tail[-1] if tail else f"exit {resp.get('exit_code')}")
         short = f"{data.get('name')} error: {str(detail)[:100]}" if failed else f"{data.get('name')} ok"
     elif kind == "step_status":
         short = f"{data.get('id')} {data.get('status')}" + (f" — {data['reason']}" if data.get("reason") else "")

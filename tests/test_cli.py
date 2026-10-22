@@ -38,6 +38,15 @@ def test_format_event():
     assert bad == "[a] tool_result: w error: no"
 
 
+def test_format_event_failed_script_shows_stderr():
+    # a failed run_python has no "error" key; the console printed "run_python error: None" (acceptance 10-22)
+    resp = {"ok": False, "exit_code": 1, "stderr_tail": "Traceback ...\nImportError: no pyarrow\n"}
+    line = format_event({"agent": "a", "kind": "tool_result", "data": {"name": "run_python", "response": resp}})
+    assert line == "[a] tool_result: run_python error: ImportError: no pyarrow"
+    resp = {"ok": False, "exit_code": 3, "stderr_tail": ""}
+    line = format_event({"agent": "a", "kind": "tool_result", "data": {"name": "run_python", "response": resp}})
+    assert line == "[a] tool_result: run_python error: exit 3"
+
 def test_format_event_step_status_reason():
     ev = {"agent": "e", "kind": "step_status", "data": {"id": "s", "status": "failed", "reason": "boom"}}
     assert format_event(ev) == "[e] step_status: s failed — boom"
