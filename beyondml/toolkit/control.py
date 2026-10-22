@@ -8,16 +8,22 @@ from beyondml.workspace.plan import Plan, load_plan, save_plan
 
 
 def control_tools(env: ToolEnv) -> list[Callable]:
-    async def ask_user(question: str) -> dict:
-        """Ask the human a question and wait for the answer.
+    async def ask_user(question: str, options: list[str] = [], recommended: str = "") -> dict:
+        """Ask the human a question and wait for the answer. In autonomous mode your recommendation is taken.
 
         Args:
             question: The question text.
+            options: Choices to offer, if the answer is one of a few.
+            recommended: The choice you would make yourself.
         """
-        env.bus.emit(env.agent, "question", {"question": question})
+        env.bus.emit(env.agent, "question", {"question": question, "options": list(options),
+                                             "recommended": recommended})
         if env.mode == "autonomous":
-            return {"answer": AUTONOMOUS_ANSWER}
-        return {"answer": await env.asker(question)}
+            return {"answer": recommended or AUTONOMOUS_ANSWER}
+        text = question
+        if options:
+            text += "\nOptions: " + " | ".join(options) + (f" (recommended: {recommended})" if recommended else "")
+        return {"answer": await env.asker(text)}
 
     def finish_step(summary: str, outputs: list[str]) -> dict:
         """Declare this step finished.

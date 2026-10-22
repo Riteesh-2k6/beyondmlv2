@@ -83,9 +83,10 @@ class Executor:
         step.touched = []
 
     # ── success check ──────────────────────────────────────────
-    def _last_metrics(self, step_id: str) -> dict:
+    def _last_metrics(self, step_id: str, key: str) -> dict:
+        """The newest metrics this step recorded that include `key` (several tools may record in one step)."""
         for record in reversed(self.project.ledger()):
-            if record.get("agent") == step_id and record.get("metrics"):
+            if record.get("agent") == step_id and key in (record.get("metrics") or {}):
                 return record["metrics"]
         return {}
 
@@ -105,7 +106,7 @@ class Executor:
             except PathError as e:
                 return False, f"expected output not allowed: {rel} ({e})"
         if sc.metric:
-            value = (metrics if metrics is not None else self._last_metrics(step.id)).get(sc.metric)
+            value = (metrics if metrics is not None else self._last_metrics(step.id, sc.metric)).get(sc.metric)
             if not isinstance(value, (int, float)):
                 return False, f"metric {sc.metric} not reported"
             if sc.min is not None and value < sc.min:

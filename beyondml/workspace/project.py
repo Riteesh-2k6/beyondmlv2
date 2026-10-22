@@ -15,11 +15,11 @@ from typing import Iterable
 GITIGNORE = ("data/raw/\ndata/processed/\n.beyondml/sessions.sqlite*\n.beyondml/runs/\n*.pkl\n*.joblib\n*.pt\n"
              "__pycache__/\n")
 DEFAULT_SETTINGS = {
-    "model": {"default": "ollama_chat/qwen2.5:14b", "api_base": "http://127.0.0.1:11434"},
+    "model": {"default": "ollama_chat/qwen3:8b", "api_base": "http://127.0.0.1:11434"},
     "run": {"mode": "auto", "max_tool_calls": 40, "budget_minutes": 60, "budget_usd": 2.0},
 }
 SETTINGS_TOML = (
-    '[model]\ndefault = "ollama_chat/qwen2.5:14b"\napi_base = "http://127.0.0.1:11434"\n\n'
+    '[model]\ndefault = "ollama_chat/qwen3:8b"\napi_base = "http://127.0.0.1:11434"\n\n'
     '[run]\nmode = "auto"\nmax_tool_calls = 40\nbudget_minutes = 60\nbudget_usd = 2.0\n'
 )
 DIRS = ["data/raw", "data/processed", "src", "models", "reports", "agents", ".beyondml/skills"]

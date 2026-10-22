@@ -109,7 +109,7 @@ async def _approve(payload: dict) -> bool:
 @click.option("--project", "project_dir", default=".", show_default=True, type=click.Path(file_okay=False))
 @click.option("--mode", type=click.Choice(["ask", "auto", "autonomous"]), default=None,
               help="ask: confirm every run; auto: confirm installs and network; autonomous: never ask.")
-@click.option("--model", default=None, help="Model for every agent, e.g. ollama_chat/qwen2.5:14b.")
+@click.option("--model", default=None, help="Model for every agent, e.g. ollama_chat/qwen3:8b.")
 def run(goal, data, project_dir, mode, model):
     """Plan and build an ML project headless (resumes an unfinished plan when GOAL is omitted)."""
     from beyondml.harness.run import GoalRequired, run_goal
