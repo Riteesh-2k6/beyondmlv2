@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import asyncio
 import functools
+import logging
 import re
 from dataclasses import dataclass, field
 from typing import Callable
@@ -36,7 +37,9 @@ def default_resolver(project: Project) -> ModelResolver:
     return resolve
 
 
-RATE_LIMIT_WAITS = 10  # ponytail: fixed count; a daily-quota 429 still fails after ~10 min of waiting
+RATE_LIMIT_WAITS = 10
+MAX_RATE_LIMIT_WAIT = 120.0  # a provider asking for longer is enforcing a quota, not a burst limit: fail fast
+log = logging.getLogger("beyondml")
 
 
 def _retry_after(error) -> float:
@@ -69,9 +72,12 @@ def _llm_class():
                         yield response
                     return
                 except RateLimitError as error:
-                    if started or attempt == RATE_LIMIT_WAITS:
+                    wait = _retry_after(error)
+                    if started or attempt == RATE_LIMIT_WAITS or wait > MAX_RATE_LIMIT_WAIT:
                         raise
-                    await asyncio.sleep(_retry_after(error))
+                    log.warning("%s rate-limited; waiting %.1fs (%d/%d)", self.model, wait, attempt + 1,
+                                RATE_LIMIT_WAITS)
+                    await asyncio.sleep(wait)
 
     return BeyondLlm
 

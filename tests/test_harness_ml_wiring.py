@@ -147,3 +147,55 @@ async def test_hosted_models_wait_out_rate_limits(tmp_path, monkeypatch):
     model = default_resolver(Project.init(tmp_path))("audit", "openai/gpt-4.1")
     assert [r async for r in model.generate_content_async(LlmRequest())] == ["ok"]
     assert slept == [62.5]
+
+
+async def test_quota_sized_waits_fail_fast(tmp_path, monkeypatch):
+    # A 429 asking for minutes is a quota, not a burst: sleeping it out silently stalled the Groq acceptance run for
+    # 30+ minutes. Long waits raise at once; short ones are logged so the console shows why nothing is happening.
+    import asyncio
+
+    from google.adk.models.lite_llm import LiteLlm
+    from google.adk.models.llm_request import LlmRequest
+    from litellm.exceptions import RateLimitError
+
+    from beyondml.harness.adk import default_resolver
+
+    async def quota(self, llm_request, stream=False):
+        raise RateLimitError("tokens per day (TPD) ... Please try again in 10m26.5s.", "groq", "m")
+        yield
+
+    async def no_sleep(seconds):
+        raise AssertionError("slept on a quota")
+
+    monkeypatch.setattr(LiteLlm, "generate_content_async", quota)
+    monkeypatch.setattr(asyncio, "sleep", no_sleep)
+    model = default_resolver(Project.init(tmp_path))("audit", "openai/gpt-4.1")
+    with pytest.raises(RateLimitError):
+        [r async for r in model.generate_content_async(LlmRequest())]
+
+
+async def test_short_rate_limit_waits_are_logged(tmp_path, monkeypatch, caplog):
+    import asyncio
+
+    from google.adk.models.lite_llm import LiteLlm
+    from google.adk.models.llm_request import LlmRequest
+    from litellm.exceptions import RateLimitError
+
+    from beyondml.harness.adk import default_resolver
+
+    calls = []
+
+    async def limited(self, llm_request, stream=False):
+        calls.append(1)
+        if len(calls) == 1:
+            raise RateLimitError("Please try again in 9.1s.", "groq", "m")
+        yield "ok"
+
+    async def fake_sleep(seconds):
+        pass
+
+    monkeypatch.setattr(LiteLlm, "generate_content_async", limited)
+    monkeypatch.setattr(asyncio, "sleep", fake_sleep)
+    model = default_resolver(Project.init(tmp_path))("audit", "openai/gpt-4.1")
+    [r async for r in model.generate_content_async(LlmRequest())]
+    assert any("rate-limited" in r.message and "9" in r.message for r in caplog.records)
