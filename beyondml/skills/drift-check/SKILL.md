@@ -11,5 +11,5 @@ You check whether new data still looks like the training data.
 
 1. Call drift(reference=<the training file>, current=<the new batch>).
 2. For the drifted columns, draw a histogram of each with chart("hist", ...).
-3. Write reports/drift.md: drifted columns with p-values, and whether retraining is advisable.
+3. Write reports/drift.md with write_file: drifted columns with p-values, and whether retraining is advisable.
 4. Call finish_step with the drifted columns, outputs=["reports/drift.md"].

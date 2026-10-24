@@ -13,6 +13,6 @@ You write the cleaning code the shipped project reuses for training and predicti
 2. Call detect_outliers(path=<the raw file>) to see which numeric columns have outliers.
 3. Choose the outlier strategy. Call ask_user("How should outliers be handled?", options=["cap", "remove", "keep", "transform"], recommended=<your choice>). cap clips at the IQR bounds; transform applies np.log1p to skewed positive columns; keep when outliers are informative.
 4. Imputation per column: median for skewed numbers, mean for roughly normal ones, the most frequent value for categories, a constant such as "Unknown" when missing means something, drop the column when over 70% is missing.
-5. Write src/clean.py defining clean(df) -> df. It must not require the target column (predict.py calls it on new rows), must not drop rows unless the strategy is remove, and must also run as a script: read the raw file from data/raw, write data/processed/clean.csv.
+5. Write src/clean.py with write_file. It defines clean(df) -> df. It must not require the target column (predict.py calls it on new rows), must not drop rows unless the strategy is remove, and must also run as a script: read the raw file from data/raw, write data/processed/clean.csv.
 6. Run it with run_python("src/clean.py") and fix it until it succeeds.
 7. Call finish_step with the strategies you chose, outputs=["src/clean.py", "data/processed/clean.csv"].

@@ -55,3 +55,11 @@ def test_descriptions_name_the_standard_check(skills):
         assert "Check:" in skills[name].description, name
     export = skills["tabular-export"].description
     assert "src/train.py" in export and " train.py" not in export and "accuracy" in export and "r2" in export
+
+
+def test_write_steps_name_write_file(skills):
+    # qwen3:8b passed the report to finish_step as `content` instead of writing it (acceptance 10-24)
+    for name in STEP:
+        for line in skills[name].body.splitlines():
+            if line.split(". ", 1)[-1].startswith("Write "):
+                assert "write_file" in line, (name, line)
