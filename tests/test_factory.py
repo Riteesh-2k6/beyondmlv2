@@ -13,7 +13,7 @@ from beyondml.workspace.plan import Plan, Step
 from beyondml.workspace.project import Project
 from scripted_llm import ScriptedLlm, fc, scripted_resolver, txt
 
-HEADINGS = ["You are the 'b' agent", "## Your step", "## Upstream results", "## Project", "## Memory",
+HEADINGS = ["You are the 'b' agent", "## Your step", "## Upstream results", "## Project", "## Data", "## Memory",
             "## How to do this step", "## Rules"]
 
 
@@ -52,6 +52,15 @@ def test_instruction_written_in_order(tmp_path):
     assert "Do the demo thing." in text and "predict churn" in text and "- a: made clean.csv" in text
     assert "## Previous attempt failed" not in text
 
+
+def test_instruction_includes_data(tmp_path):
+    # step agents never saw DATA.md, so qwen3:8b guessed Kaggle's column names (Survived, Pclass) and eda aborted (10-24)
+    project = Project.init(tmp_path / "p", goal="g")
+    project.write("DATA.md", "# Data\n- dtypes: {'gender': 'int64', 'target': 'int64'}\n")
+    _setup(project.root)
+    text = (project.root / "agents/b/instruction.md").read_text(encoding="utf-8")
+    assert "## Data" in text and "'gender': 'int64'" in text
+    assert text.index("## Project") < text.index("## Data") < text.index("## How to do this step")
 
 def test_previous_failure_section(tmp_path):
     _setup(tmp_path, last_failure="boom")

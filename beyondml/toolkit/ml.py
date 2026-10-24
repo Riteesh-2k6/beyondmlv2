@@ -46,6 +46,13 @@ def _read(env: ToolEnv, path: str) -> pd.DataFrame:
     return pd.read_parquet(p) if p.suffix.lower() == ".parquet" else pd.read_csv(p)
 
 
+def _need(df: pd.DataFrame, *columns: str) -> None:
+    """Name the real columns when one is missing, so the model can correct a guessed name."""
+    for column in columns:
+        if column and column not in df.columns:
+            raise KeyError(f"no column {column!r}; columns are {list(df.columns)}")
+
+
 def _record(env: ToolEnv, tool: str, metrics: dict | None = None, **extra) -> None:
     env.project.ledger_append({"agent": env.agent, "tool": tool, "metrics": metrics or {}, **extra})
 
@@ -164,9 +171,7 @@ def _figure(kind: str, df: pd.DataFrame, x: str, y: str, title: str):
 
     if kind not in CHART_KINDS:
         raise ValueError(f"unknown chart kind {kind!r}; expected one of {CHART_KINDS}")
-    for column in (x, y):
-        if column and column not in df.columns:
-            raise KeyError(f"no column {column!r}")
+    _need(df, x, y)
     if kind == "corr":
         return px.imshow(df.select_dtypes("number").corr(), title=title, text_auto=".2f")
     if kind == "hist":
@@ -187,6 +192,7 @@ def ml_tools(env: ToolEnv) -> list[Callable]:
             target: Target column, if known.
         """
         df = _read(env, path)
+        _need(df, target)
         report = DatasetProfiler(df, target_column=target or None).run()
         result = {"ok": True, "path": path, "target": target or None, "rows": int(len(df)),
                   "cols": int(df.shape[1]), **{k: report.get(k) for k in PROFILE_KEYS}}

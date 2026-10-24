@@ -67,6 +67,13 @@ async def test_tools_read_parquet(env, classification_df):
     classification_df.to_parquet(env.project.root / "data" / "raw" / "t.parquet", index=False)
     assert tools(env)["profile"]("data/raw/t.parquet", target="target")["rows"] == 200
 
+async def test_missing_column_errors_list_the_columns(env):
+    # profile returned ok for target="Survived" (no such column), so qwen3:8b trusted Kaggle's names (acceptance 10-24)
+    t = tools(env)
+    bad = t["profile"]("data/raw/t.csv", target="Survived")
+    assert bad["ok"] is False and "Survived" in bad["error"] and "age" in bad["error"]
+    assert "age" in t["chart"]("bar", "data/raw/t.csv", "Pclass")["error"]
+
 async def test_chart_tool(env):
     result = tools(env)["chart"]("hist", "data/raw/t.csv", "age", title="Age spread")
     assert result["ok"]

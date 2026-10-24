@@ -38,6 +38,7 @@ def _instruction(project: Project, plan: Plan, step: Step, skill: SkillInfo) -> 
         parts.append(f"## Previous attempt failed\n{step.last_failure}")
     parts += [
         f"## Project\n{project.read('PROJECT.md')}",
+        f"## Data\n{project.read('DATA.md')}",  # the real column names; small models otherwise guess famous ones
         f"## Memory\n{project.read('MEMORY.md')}",
         f"## How to do this step\n{skill.body}",
         f"## Rules\n{RULES}",
