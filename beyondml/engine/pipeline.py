@@ -52,6 +52,8 @@ def column_kinds(X: pd.DataFrame) -> tuple[list[str], list[bool]]:
 
 MAX_CATEGORIES = 50  # per categorical column; rarer values share one "infrequent" column (a ticket or zip code
                     # would otherwise one-hot into thousands of columns). export.PREPROCESS ships the same number.
+# ponytail: the cap applies to every categorical column, ~5% fit cost on small frames (latency bench, 10-24);
+# cap only columns wider than MAX_CATEGORIES (cardinality in the spec) if the speed target tightens.
 
 
 def preprocessor(numeric: list[str], categorical: list[str], dense: bool = False) -> ColumnTransformer:
