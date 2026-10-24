@@ -8,7 +8,7 @@ from __future__ import annotations
 import shutil
 from pathlib import Path
 
-from .pipeline import build_ensemble, make_model
+from .pipeline import MAX_CATEGORIES, build_ensemble, make_model
 
 HEADER = '"""The pipeline BeyondML\'s search scored, written out with literals. Edit freely: train.py re-scores it."""\n'
 
@@ -57,9 +57,9 @@ PREPROCESS = '''def preprocessor(numeric, categorical, dense=False):
     return ColumnTransformer([
         ("num", make_pipeline(SimpleImputer(strategy="median"), StandardScaler()), numeric),
         ("cat", make_pipeline(SimpleImputer(strategy="constant", fill_value="missing"),
-                              OneHotEncoder(handle_unknown="ignore")), categorical),
+                              OneHotEncoder(handle_unknown="ignore", max_categories=%d)), categorical),
     ], sparse_threshold=0.0 if dense else 0.3)
-'''
+''' % MAX_CATEGORIES
 BASE_IMPORTS = ["from sklearn.compose import ColumnTransformer", "from sklearn.impute import SimpleImputer",
                 "from sklearn.pipeline import make_pipeline",
                 "from sklearn.preprocessing import OneHotEncoder, StandardScaler"]
@@ -161,9 +161,14 @@ def prepare(df):
 def main():
     df = prepare(pd.read_csv(ROOT / DATA))
     df = df[df[TARGET].notna()]
-    X, y = df[FEATURES], df[TARGET]
     classification = PROBLEM == "classification"
-    stratify = y if classification and y.value_counts().min() >= 2 else None
+    if classification:  # a class with one row can be neither stratified nor learned from a split
+        df = df[df[TARGET].map(df[TARGET].value_counts()) >= 2]
+        if df[TARGET].nunique() < 2:
+            print(f"{TARGET} needs at least two classes with 2+ rows each", file=sys.stderr)
+            return 2
+    X, y = df[FEATURES], df[TARGET]
+    stratify = y if classification else None
     X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=0, stratify=stratify)
     score = float(build_pipeline().fit(X_train, y_train).score(X_test, y_test))
     model = build_pipeline().fit(X, y)
@@ -172,10 +177,11 @@ def main():
     metrics = {"accuracy" if classification else "r2": score, "n_train": len(X_train), "n_test": len(X_test)}
     Path(os.environ.get("BEYONDML_METRICS", "metrics.json")).write_text(json.dumps(metrics))
     print(json.dumps(metrics))
+    return 0
 
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main())
 '''
 
 PREDICT_PY = '''"""Predict with the trained model: python src/predict.py INPUT.csv [OUTPUT.csv]. Written by BeyondML."""
@@ -197,7 +203,14 @@ def main(argv):
     if not argv:
         print("usage: python src/predict.py INPUT.csv [OUTPUT.csv]", file=sys.stderr)
         return 2
-    df = prepare(pd.read_csv(argv[0]))
+    try:
+        df = prepare(pd.read_csv(argv[0]))
+    except KeyError as e:  # clean.py or features.py needs a column the input lacks
+        print(f"missing columns: {e.args[0]}", file=sys.stderr)
+        return 2
+    except (ValueError, TypeError) as e:  # e.g. text where clean.py or features.py expects numbers
+        print(f"invalid input: {e}", file=sys.stderr)
+        return 2
     missing = [c for c in REQUIRED if c not in df.columns]
     if missing:
         print("missing columns: " + ", ".join(missing), file=sys.stderr)
@@ -207,7 +220,11 @@ def main(argv):
             df[column] = np.nan
     model = joblib.load(ROOT / "models" / "model.joblib")
     out = df.copy()
-    out["prediction"] = model.predict(df[FEATURES])
+    try:
+        out["prediction"] = model.predict(df[FEATURES])
+    except ValueError as e:  # e.g. text in a numeric column
+        print(f"invalid input: {e}", file=sys.stderr)
+        return 2
     target = argv[1] if len(argv) > 1 else "predictions.csv"
     out.to_csv(target, index=False)
     print(f"wrote {len(out)} predictions to {target}")
@@ -292,7 +309,14 @@ def main(argv):
     if not argv:
         print("usage: python src/predict.py INPUT.csv [OUTPUT.csv]", file=sys.stderr)
         return 2
-    df = prepare(pd.read_csv(argv[0]))
+    try:
+        df = prepare(pd.read_csv(argv[0]))
+    except KeyError as e:  # clean.py or features.py needs a column the input lacks
+        print(f"missing columns: {e.args[0]}", file=sys.stderr)
+        return 2
+    except (ValueError, TypeError) as e:  # e.g. text where clean.py or features.py expects numbers
+        print(f"invalid input: {e}", file=sys.stderr)
+        return 2
     missing = [c for c in REQUIRED if c not in df.columns]
     if missing:
         print("missing columns: " + ", ".join(missing), file=sys.stderr)
@@ -300,7 +324,11 @@ def main(argv):
     bundle = joblib.load(ROOT / "models" / "model.joblib")
     model, assigner = bundle["pipeline"], bundle["assigner"]
     X = df[FEATURES]
-    labels = assigner.predict(model[:-1].transform(X)) if assigner is not None else model.predict(X)
+    try:
+        labels = assigner.predict(model[:-1].transform(X)) if assigner is not None else model.predict(X)
+    except ValueError as e:  # e.g. text in a numeric column
+        print(f"invalid input: {e}", file=sys.stderr)
+        return 2
     target = argv[1] if len(argv) > 1 else "clusters_new.csv"
     df.assign(cluster=labels).to_csv(target, index=False)
     print(f"wrote {len(df)} cluster labels to {target}")

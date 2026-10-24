@@ -1,4 +1,5 @@
 import importlib.util
+import json
 import subprocess
 import sys
 from pathlib import Path
@@ -133,3 +134,51 @@ def test_rendered_code_never_imports_beyondml(tmp_path):
     for rel in files:
         text = (root / rel).read_text(encoding="utf-8")
         assert "import beyondml" not in text and "from beyondml" not in text
+
+
+def test_export_equivalence_high_cardinality(tmp_path):
+    # review 10-24: a 400-value column was one-hot encoded without limit; the cap must ship in pipeline.py too
+    rng = np.random.RandomState(0)
+    df = pd.DataFrame({"ticket": [f"t{i}" for i in rng.randint(0, 400, 600)], "x": rng.normal(size=600)})
+    df["target"] = (df["x"] > 0).astype(int)
+    from beyondml.engine.pipeline import MAX_CATEGORIES, preprocessor
+    assert preprocessor(["x"], ["ticket"]).fit_transform(df).shape[1] <= MAX_CATEGORIES + 1
+    profile = DatasetProfiler(df, target_column="target").run()
+    equivalence(df, profile, warm_seeds("classification", 2, models=("LogisticRegression",))[0], tmp_path)
+
+
+def test_train_drops_single_row_classes(tmp_path):
+    # review 10-24: a one-row class can be neither stratified nor cross-validated
+    rng = np.random.RandomState(0)
+    df = pd.DataFrame({"x": rng.normal(size=60)})
+    df["target"] = np.where(df["x"] > 0, "a", "b")
+    df.loc[0, "target"] = "rare"
+    root, _ = project(tmp_path, df, warm_seeds("classification", 1, models=("LogisticRegression",))[0])
+    trained = run(root, "src/train.py")
+    assert trained.returncode == 0, trained.stderr
+    metrics = json.loads((root / "metrics.json").read_text())
+    assert metrics["n_train"] + metrics["n_test"] == 59
+
+
+def test_train_single_class_left_exits_2(tmp_path):
+    df = pd.DataFrame({"x": np.arange(30.0), "target": ["a"] * 29 + ["b"]})
+    root, _ = project(tmp_path, df, warm_seeds("classification", 1, models=("LogisticRegression",))[0])
+    trained = run(root, "src/train.py")
+    assert trained.returncode == 2 and "two classes" in trained.stderr
+
+
+def test_predict_bad_input_exits_2(tmp_path):
+    # review 10-24: a column clean/features need, or a non-numeric value, gave a traceback instead of exit 2
+    rng = np.random.RandomState(1)
+    df = pd.DataFrame({"colour": rng.choice(["r", "g"], 80), "x": rng.normal(size=80)})
+    df["target"] = (df["x"] > 0).astype(int)
+    root, _ = project(tmp_path, df, warm_seeds("classification", 2, models=("LogisticRegression",))[0])
+    (root / "src" / "features.py").write_text("def make_features(df):\n    return df.assign(x2=df['x'] * 2)\n",
+                                              encoding="utf-8")
+    assert run(root, "src/train.py").returncode == 0
+    pd.DataFrame({"colour": ["r"]}).to_csv(root / "no_x.csv", index=False)
+    short = run(root, "src/predict.py", "no_x.csv", "o.csv")
+    assert short.returncode == 2 and "x" in short.stderr and "Traceback" not in short.stderr
+    pd.DataFrame({"colour": ["r"], "x": ["abc"]}).to_csv(root / "bad.csv", index=False)
+    bad = run(root, "src/predict.py", "bad.csv", "o2.csv")
+    assert bad.returncode == 2 and "abc" in bad.stderr and "Traceback" not in bad.stderr

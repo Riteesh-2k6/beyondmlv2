@@ -50,12 +50,16 @@ def column_kinds(X: pd.DataFrame) -> tuple[list[str], list[bool]]:
     return names, [bool(pd.api.types.is_numeric_dtype(X[c])) for c in names]
 
 
+MAX_CATEGORIES = 50  # per categorical column; rarer values share one "infrequent" column (a ticket or zip code
+                    # would otherwise one-hot into thousands of columns). export.PREPROCESS ships the same number.
+
+
 def preprocessor(numeric: list[str], categorical: list[str], dense: bool = False) -> ColumnTransformer:
     """dense=True for clusterers (PCA and silhouette want dense input); supervised models keep sklearn's default."""
     return ColumnTransformer([
         ("num", make_pipeline(SimpleImputer(strategy="median"), StandardScaler()), numeric),
         ("cat", make_pipeline(SimpleImputer(strategy="constant", fill_value="missing"),
-                              OneHotEncoder(handle_unknown="ignore")), categorical),
+                              OneHotEncoder(handle_unknown="ignore", max_categories=MAX_CATEGORIES)), categorical),
     ], sparse_threshold=0.0 if dense else 0.3)
 
 
