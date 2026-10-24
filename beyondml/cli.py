@@ -167,12 +167,9 @@ def run(goal, data, project_dir, mode, model):
 )
 def benchmark(datasets):
     """Run the PMLB benchmark suite."""
-    import asyncio
     from beyondml.engine.benchmarker import PMLBRunner
 
-    ds = list(datasets) if datasets else None
-    runner = PMLBRunner(datasets=ds)
-    asyncio.run(runner.run_benchmark())
+    PMLBRunner(datasets=list(datasets) or None).run_benchmark()
 
 
 def _open_session(project_dir, **kw):

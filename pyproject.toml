@@ -28,7 +28,6 @@ dependencies = [
     "textual>=0.40",
     "plotext>=5.2",
     "python-dotenv>=1.0",
-    "groq>=0.4",
     "requests>=2.31",
     "pmlb>=1.0",
     "joblib>=1.3",

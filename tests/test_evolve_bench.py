@@ -33,3 +33,18 @@ def test_quality_not_worse_than_v1():
     mu = [evolve_tabular(df, "target", profile, pop_size=10, budget=Budget(max_generations=5), seed=s)
           .best.metrics["mu_cv"] for s in (0, 1, 2)]
     assert sum(mu) / 3 >= BASELINE["quality"]["mean_mu_cv"] - 0.01, mu
+
+
+def test_pmlb_runner_evolves_without_an_llm(monkeypatch, tmp_path):
+    # the runner used the legacy LLM orchestrator and the GA adapter; it now runs evolve_tabular directly
+    from beyondml.engine import benchmarker
+
+    df = quality_frame()
+    monkeypatch.setattr(benchmarker, "fetch_data", lambda name, **kw: (df.drop(columns=["target"]).values,
+                                                                          df["target"].values))
+    monkeypatch.chdir(tmp_path)
+    runner = benchmarker.PMLBRunner(datasets=["tiny"])
+    runner.run_benchmark()
+    [row] = runner.results
+    assert row["dataset"] == "tiny" and row["model"] and 0.5 < row["mu_cv"] <= 1.0
+    assert "tiny" in (tmp_path / "benchmark_results.md").read_text()
