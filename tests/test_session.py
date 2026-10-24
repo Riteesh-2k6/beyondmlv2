@@ -14,8 +14,9 @@ def _home(tmp_path_factory, monkeypatch):
     monkeypatch.setenv("BEYONDML_HOME", str(tmp_path_factory.mktemp("bhome")))
 
 
+ANY = {"expects": ["PROJECT.md"]}  # plans need a success check; these tests are not about checks
 PLAN = {"goal": "g", "metric": "accuracy", "budget": {}, "steps": [
-    {"id": "a", "skill": "python-step", "goal": "do a"}]}
+    {"id": "a", "skill": "python-step", "goal": "do a", "success_check": ANY}]}
 PLANNER = [[fc("submit_plan", plan=PLAN)], [txt("planned")]]
 ASKER = [[fc("ask_user", question="which colour?")], [fc("finish_step", summary="a done", outputs=[])], [txt("ok")]]
 METRIC_PY = 'import json, os\njson.dump({"accuracy": 0.91}, open(os.environ["BEYONDML_METRICS"], "w"))\n'

@@ -15,9 +15,10 @@ def _home(tmp_path_factory, monkeypatch):
     monkeypatch.setenv("BEYONDML_HOME", str(tmp_path_factory.mktemp("bhome")))
 
 
+ANY = {"expects": ["PROJECT.md"]}  # plans need a success check; these tests are not about checks
 TWO = {"goal": "g", "metric": "accuracy", "budget": {}, "steps": [
-    {"id": "prepare", "skill": "python-step", "goal": "clean"},
-    {"id": "train", "skill": "python-step", "goal": "fit", "depends_on": ["prepare"]}]}
+    {"id": "prepare", "skill": "python-step", "goal": "clean", "success_check": ANY},
+    {"id": "train", "skill": "python-step", "goal": "fit", "depends_on": ["prepare"], "success_check": ANY}]}
 SIZE = (120, 40)
 
 
