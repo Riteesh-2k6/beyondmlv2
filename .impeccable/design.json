@@ -1,0 +1,178 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-10-21",
+  "title": "Design System: BeyondML",
+  "extensions": {
+    "colorMeta": {
+      "obsidian": { "role": "neutral", "displayName": "Obsidian", "canonical": "#09090B", "tonalRamp": ["#09090B", "#18181B", "#27272A", "#3F3F46", "#52525B", "#71717A", "#A1A1AA", "#E4E4E7"] },
+      "surface": { "role": "neutral", "displayName": "Surface", "canonical": "#18181B", "tonalRamp": ["#09090B", "#18181B", "#27272A", "#3F3F46", "#52525B", "#71717A", "#A1A1AA", "#E4E4E7"] },
+      "hairline": { "role": "neutral", "displayName": "Hairline", "canonical": "#27272A", "tonalRamp": ["#09090B", "#18181B", "#27272A", "#3F3F46", "#52525B", "#71717A", "#A1A1AA", "#E4E4E7"] },
+      "rule-strong": { "role": "neutral", "displayName": "Rule Strong", "canonical": "#3F3F46", "tonalRamp": ["#09090B", "#18181B", "#27272A", "#3F3F46", "#52525B", "#71717A", "#A1A1AA", "#E4E4E7"] },
+      "fg": { "role": "neutral", "displayName": "Foreground", "canonical": "#E4E4E7", "tonalRamp": ["#09090B", "#18181B", "#27272A", "#3F3F46", "#52525B", "#71717A", "#A1A1AA", "#E4E4E7"] },
+      "muted": { "role": "neutral", "displayName": "Muted", "canonical": "#85858F", "tonalRamp": ["#09090B", "#18181B", "#27272A", "#3F3F46", "#52525B", "#71717A", "#85858F", "#A1A1AA"] },
+      "mark-pending": { "role": "neutral", "displayName": "Mark Pending", "canonical": "#71717A", "tonalRamp": ["#09090B", "#18181B", "#27272A", "#3F3F46", "#52525B", "#71717A", "#A1A1AA", "#E4E4E7"] },
+      "mark-dim": { "role": "neutral", "displayName": "Mark Dim", "canonical": "#52525B", "tonalRamp": ["#09090B", "#18181B", "#27272A", "#3F3F46", "#52525B", "#71717A", "#A1A1AA", "#E4E4E7"] },
+      "chart-ink": { "role": "neutral", "displayName": "Chart Ink", "canonical": "#A1A1AA", "tonalRamp": ["#09090B", "#18181B", "#27272A", "#3F3F46", "#52525B", "#71717A", "#A1A1AA", "#E4E4E7"] },
+      "chart-pale": { "role": "neutral", "displayName": "Chart Pale", "canonical": "#D4D4D8", "tonalRamp": ["#09090B", "#18181B", "#27272A", "#3F3F46", "#52525B", "#71717A", "#A1A1AA", "#D4D4D8"] },
+      "orange": { "role": "primary", "displayName": "Signal Orange", "canonical": "#F97316", "tonalRamp": ["#7C2D12", "#9A3412", "#C2410C", "#EA580C", "#F97316", "#FB923C", "#FDBA74", "#FED7AA"] },
+      "success": { "role": "status", "displayName": "Success", "canonical": "#22C55E", "tonalRamp": ["#14532D", "#166534", "#15803D", "#16A34A", "#22C55E", "#4ADE80", "#86EFAC", "#BBF7D0"] },
+      "danger": { "role": "status", "displayName": "Danger", "canonical": "#EF4444", "tonalRamp": ["#7F1D1D", "#991B1B", "#B91C1C", "#DC2626", "#EF4444", "#F87171", "#FCA5A5", "#FECACA"] }
+    },
+    "typographyMeta": {
+      "headline": { "displayName": "Headline", "purpose": "The project index heading only; the ceiling of the ramp." },
+      "title": { "displayName": "Title", "purpose": "Panel and modal titles, the agent header's id and step ids (in mono)." },
+      "body": { "displayName": "Body", "purpose": "Chat transcript, modal body, goals in the plan approval and the top bar." },
+      "label": { "displayName": "Label", "purpose": "The working size: tabs, buttons, form labels, panel titles at 500, step lines, log messages." },
+      "mono": { "displayName": "Mono", "purpose": "Ids, model names, paths, events, tool names, the instruction, file previews, table cells; 20px line in pre blocks." },
+      "mono-micro": { "displayName": "Mono Micro", "purpose": "Chips, kbd keys, timestamps, model names in rows, file sizes, the run state." }
+    },
+    "shadows": [
+      { "name": "modal", "value": "0 12px 40px -8px rgba(0,0,0,0.8)", "purpose": "The approval modal only, over a 70% obsidian scrim. The only shadow in the product." }
+    ],
+    "motion": [
+      { "name": "transition-colors", "value": "color, background-color, border-color 150ms cubic-bezier(0.4, 0, 0.2, 1)", "purpose": "Every hover, active and selected colour change." },
+      { "name": "breathe", "value": "opacity 1 -> 0.4 -> 1, 1.6s cubic-bezier(0.4, 0, 0.2, 1) infinite", "purpose": "The running status mark; the one authored motion." },
+      { "name": "shimmer", "value": "background-position 200% -> -200%, 1.4s ease-in-out infinite", "purpose": "Skeleton placeholders while data or Plotly loads." },
+      { "name": "modal-in", "value": "opacity 0 -> 1, translateY(6px) scale(0.985) -> none, 180ms cubic-bezier(0.16, 1, 0.3, 1)", "purpose": "The approval modal's entrance." },
+      { "name": "chevron-rotate", "value": "transform 150ms", "purpose": "Disclosure chevrons in the dock header and file tree." },
+      { "name": "reduced-motion", "value": "animation-duration 0.01ms; animation-iteration-count 1; transition-duration 0.01ms", "purpose": "prefers-reduced-motion: reduce switches all of the above off." }
+    ],
+    "breakpoints": [
+      { "name": "sm", "value": "640px" },
+      { "name": "md", "value": "768px" },
+      { "name": "lg", "value": "1024px" }
+    ],
+    "focus": { "value": "outline: 1.5px solid #F97316; outline-offset: 1px; border-radius: 2px", "purpose": "Global :focus-visible ring; inputs instead turn their border orange." },
+    "chartSeries": { "value": ["#F97316", "#A1A1AA", "#71717A", "#E4E4E7", "#D4D4D8", "#52525B"], "neutralFill": "rgba(161,161,170,0.35)", "purpose": "Plot.tsx SERIES, taken in order: one orange, then zinc neutrals. NEUTRAL_FILL fills every bar under a 1px chart-ink line. X grid off, Y grid hairline, axes rule-strong." },
+    "sharedTokenSource": "beyondml/web/ui/src/index.css (:root custom properties) and beyondml/web/ui/tailwind.config.js (theme.extend); the same values drive beyondml/tui/theme.py."
+  },
+  "components": [
+    {
+      "name": "Primary Button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "The one filled control per view: Send, Approve, Plan and run, Open project. Orange on obsidian text, 28px tall.",
+      "html": "<button class=\"ds-btn ds-btn-primary\">Approve <kbd class=\"ds-key\">y</kbd></button>",
+      "css": ".ds-btn { display: inline-flex; align-items: center; gap: 6px; height: 28px; padding: 0 10px; border: 1px solid transparent; border-radius: 2px; font: 400 12px/16px 'Geist', ui-sans-serif, system-ui, sans-serif; cursor: pointer; transition: color 150ms, background-color 150ms, border-color 150ms; } .ds-btn:disabled { opacity: 0.4; cursor: not-allowed; } .ds-btn:focus-visible { outline: 1.5px solid var(--orange, #F97316); outline-offset: 1px; } .ds-btn-primary { background: var(--orange, #F97316); border-color: var(--orange, #F97316); color: var(--bg, #09090B); } .ds-btn-primary:hover { background: rgba(249,115,22,0.9); } .ds-key { display: inline-block; padding: 0 4px; border: 1px solid var(--line, #27272A); border-radius: 2px; background: var(--surface, #18181B); font: 400 11px/16px 'Geist Mono', ui-monospace, monospace; color: var(--muted, #85858F); font-variant-numeric: tabular-nums; }"
+    },
+    {
+      "name": "Ghost Button",
+      "kind": "button",
+      "refersTo": "button-ghost",
+      "description": "The default button: hairline border, foreground text, lifts to surface on hover. Later, Resume instead.",
+      "html": "<button class=\"ds-btn ds-btn-ghost\">Later <kbd class=\"ds-key\">esc</kbd></button>",
+      "css": ".ds-btn { display: inline-flex; align-items: center; gap: 6px; height: 28px; padding: 0 10px; border: 1px solid transparent; border-radius: 2px; font: 400 12px/16px 'Geist', ui-sans-serif, system-ui, sans-serif; cursor: pointer; transition: color 150ms, background-color 150ms, border-color 150ms; } .ds-btn:disabled { opacity: 0.4; cursor: not-allowed; } .ds-btn:focus-visible { outline: 1.5px solid var(--orange, #F97316); outline-offset: 1px; } .ds-btn-ghost { background: transparent; border-color: var(--line, #27272A); color: var(--fg, #E4E4E7); } .ds-btn-ghost:hover { background: var(--surface, #18181B); border-color: var(--muted, #85858F); } .ds-key { display: inline-block; padding: 0 4px; border: 1px solid var(--line, #27272A); border-radius: 2px; background: var(--surface, #18181B); font: 400 11px/16px 'Geist Mono', ui-monospace, monospace; color: var(--muted, #85858F); }"
+    },
+    {
+      "name": "Danger Button",
+      "kind": "button",
+      "refersTo": "button-danger",
+      "description": "Stop and Deny: red text and a red border at 60%, tinting 10% red on hover. Never filled.",
+      "html": "<button class=\"ds-btn ds-btn-danger\">Deny <kbd class=\"ds-key\">n</kbd></button>",
+      "css": ".ds-btn { display: inline-flex; align-items: center; gap: 6px; height: 28px; padding: 0 10px; border: 1px solid transparent; border-radius: 2px; font: 400 12px/16px 'Geist', ui-sans-serif, system-ui, sans-serif; cursor: pointer; transition: color 150ms, background-color 150ms, border-color 150ms; } .ds-btn:disabled { opacity: 0.4; cursor: not-allowed; } .ds-btn:focus-visible { outline: 1.5px solid var(--orange, #F97316); outline-offset: 1px; } .ds-btn-danger { background: transparent; border-color: rgba(239,68,68,0.6); color: #EF4444; } .ds-btn-danger:hover { background: rgba(239,68,68,0.1); } .ds-key { display: inline-block; padding: 0 4px; border: 1px solid var(--line, #27272A); border-radius: 2px; background: var(--surface, #18181B); font: 400 11px/16px 'Geist Mono', ui-monospace, monospace; color: var(--muted, #85858F); }"
+    },
+    {
+      "name": "Field",
+      "kind": "input",
+      "refersTo": "input",
+      "description": "Every text input and select: obsidian fill, hairline border, 28px, orange border and caret on focus. Labels sit 4px above in 12px muted.",
+      "html": "<label class=\"ds-label\" for=\"ds-goal\">goal</label><input id=\"ds-goal\" class=\"ds-field\" placeholder=\"predict churn from the usage and billing columns; optimise F1\">",
+      "css": ".ds-label { display: block; margin-bottom: 4px; font: 400 12px/16px 'Geist', ui-sans-serif, system-ui, sans-serif; color: var(--muted, #85858F); } .ds-field { display: block; width: 100%; height: 28px; padding: 0 8px; border: 1px solid var(--line, #27272A); border-radius: 2px; background: var(--bg, #09090B); color: var(--fg, #E4E4E7); font: 400 12px/16px 'Geist', ui-sans-serif, system-ui, sans-serif; caret-color: var(--orange, #F97316); } .ds-field::placeholder { color: var(--muted, #85858F); } .ds-field:focus { outline: none; border-color: var(--orange, #F97316); }"
+    },
+    {
+      "name": "Chip",
+      "kind": "chip",
+      "refersTo": "chip",
+      "description": "Mono metadata in a hairline box: dependencies, inputs, outputs, k=v metrics, attempt counts. Tones accent and danger colour the border at half strength.",
+      "html": "<span class=\"ds-chip\">&larr; eda</span> <span class=\"ds-chip\">f1=<span class=\"ds-chip-val\">0.8412</span></span> <span class=\"ds-chip\">attempt 2</span> <span class=\"ds-chip ds-chip-accent\">selected</span> <span class=\"ds-chip ds-chip-danger\">failed</span>",
+      "css": ".ds-chip { display: inline-flex; align-items: center; padding: 1px 6px; border: 1px solid var(--line, #27272A); border-radius: 2px; font: 400 11px/16px 'Geist Mono', ui-monospace, monospace; font-variant-numeric: tabular-nums; color: var(--muted, #85858F); } .ds-chip-val { color: var(--fg, #E4E4E7); } .ds-chip-accent { border-color: rgba(249,115,22,0.4); color: var(--orange, #F97316); } .ds-chip-danger { border-color: rgba(239,68,68,0.5); color: #EF4444; }"
+    },
+    {
+      "name": "Top Bar Tabs",
+      "kind": "nav",
+      "refersTo": "nav-tab",
+      "description": "The four screens in the 40px surface top bar. Muted text, hover to foreground, the active tab drops to obsidian with orange text; each shows its number key.",
+      "html": "<header class=\"ds-topbar\"><span class=\"ds-topbar-brand\">BeyondML</span><span class=\"ds-topbar-project\">churn-model</span><nav class=\"ds-tabs\"><a class=\"ds-tab ds-tab-active\" href=\"#\">Plan <kbd class=\"ds-key\">1</kbd></a><a class=\"ds-tab\" href=\"#\">Agents <kbd class=\"ds-key\">2</kbd></a><a class=\"ds-tab\" href=\"#\">Experiments <kbd class=\"ds-key\">3</kbd></a><a class=\"ds-tab\" href=\"#\">Files <kbd class=\"ds-key\">4</kbd></a></nav><span class=\"ds-topbar-state\"><svg width=\"10\" height=\"10\" viewBox=\"0 0 10 10\" class=\"ds-mark-running\"><circle cx=\"5\" cy=\"5\" r=\"3.5\" fill=\"none\" stroke=\"#F97316\" stroke-width=\"1.5\"/><path d=\"M 5 1.5 A 3.5 3.5 0 0 1 5 8.5 Z\" fill=\"#F97316\"/></svg><span class=\"ds-topbar-running\">running</span></span><button class=\"ds-waiting\">2 waiting <kbd class=\"ds-key\">a</kbd></button></header>",
+      "css": ".ds-topbar { display: flex; align-items: center; gap: 12px; height: 40px; padding: 0 12px; background: var(--surface, #18181B); border-bottom: 1px solid var(--line, #27272A); font-family: 'Geist', ui-sans-serif, system-ui, sans-serif; } .ds-topbar-brand { font: 500 14px/20px 'Geist', ui-sans-serif, system-ui, sans-serif; color: var(--orange, #F97316); } .ds-topbar-project { font: 400 14px/20px 'Geist Mono', ui-monospace, monospace; color: var(--fg, #E4E4E7); } .ds-tabs { display: flex; align-items: center; gap: 2px; margin-left: 8px; } .ds-tab { display: inline-flex; align-items: center; gap: 6px; height: 28px; padding: 0 8px; border-radius: 2px; font: 400 12px/16px 'Geist', ui-sans-serif, system-ui, sans-serif; color: var(--muted, #85858F); text-decoration: none; transition: color 150ms, background-color 150ms; } .ds-tab:hover { color: var(--fg, #E4E4E7); } .ds-tab-active { background: var(--bg, #09090B); color: var(--orange, #F97316); } .ds-tab:focus-visible { outline: 1.5px solid var(--orange, #F97316); outline-offset: 1px; } .ds-key { display: inline-block; padding: 0 4px; border: 1px solid var(--line, #27272A); border-radius: 2px; background: var(--surface, #18181B); font: 400 11px/16px 'Geist Mono', ui-monospace, monospace; color: var(--muted, #85858F); } .ds-topbar-state { display: inline-flex; align-items: center; gap: 6px; margin-left: auto; font: 400 11px/16px 'Geist Mono', ui-monospace, monospace; } .ds-topbar-running { color: var(--orange, #F97316); } .ds-waiting { display: inline-flex; align-items: center; gap: 6px; height: 28px; padding: 0 8px; border: 1px solid rgba(249,115,22,0.6); border-radius: 2px; background: transparent; color: var(--orange, #F97316); font: 400 12px/16px 'Geist', ui-sans-serif, system-ui, sans-serif; cursor: pointer; transition: background-color 150ms; } .ds-waiting:hover { background: rgba(249,115,22,0.1); } @keyframes ds-breathe { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } } .ds-mark-running { animation: ds-breathe 1.6s cubic-bezier(0.4, 0, 0.2, 1) infinite; } @media (prefers-reduced-motion: reduce) { .ds-mark-running { animation: none; } }"
+    },
+    {
+      "name": "Panel Title",
+      "kind": "custom",
+      "refersTo": "panel-title",
+      "description": "The 32px surface strip over every scrolling region: 12px/500 heading left, 11px muted mono metadata and a text link right.",
+      "html": "<div class=\"ds-panel-title\"><h2 class=\"ds-panel-h\">predict churn; optimise F1</h2><div class=\"ds-panel-meta\"><span class=\"ds-panel-mono\">3 done &middot; 1 running &middot; 2 pending</span><span>metric f1</span><a class=\"ds-panel-link\" href=\"#\">resume</a></div></div>",
+      "css": ".ds-panel-title { display: flex; align-items: center; justify-content: space-between; height: 32px; padding: 0 12px; background: var(--surface, #18181B); border-bottom: 1px solid var(--line, #27272A); } .ds-panel-h { margin: 0; font: 500 12px/16px 'Geist', ui-sans-serif, system-ui, sans-serif; color: var(--fg, #E4E4E7); } .ds-panel-meta { display: flex; align-items: center; gap: 8px; font: 400 11px/16px 'Geist', ui-sans-serif, system-ui, sans-serif; color: var(--muted, #85858F); } .ds-panel-mono { font-family: 'Geist Mono', ui-monospace, monospace; font-variant-numeric: tabular-nums; } .ds-panel-link { color: var(--orange, #F97316); text-decoration: none; text-underline-offset: 3px; } .ds-panel-link:hover { text-decoration: underline; }"
+    },
+    {
+      "name": "Status Marks",
+      "kind": "custom",
+      "refersTo": "step-row",
+      "description": "The six drawn marks at 1.5px stroke, one per status, with the status word in muted mono beside it; the mark alone carries the colour. The terminal client renders the same six as glyphs.",
+      "html": "<div class=\"ds-marks\"><span class=\"ds-status\"><svg width=\"12\" height=\"12\" viewBox=\"0 0 12 12\" style=\"color:#71717A\"><circle cx=\"6\" cy=\"6\" r=\"4.5\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.5\"/></svg>pending</span><span class=\"ds-status\"><svg width=\"12\" height=\"12\" viewBox=\"0 0 12 12\" class=\"ds-mark-running\" style=\"color:#F97316\"><circle cx=\"6\" cy=\"6\" r=\"4.5\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.5\"/><path d=\"M 6 1.5 A 4.5 4.5 0 0 1 6 10.5 Z\" fill=\"currentColor\"/></svg>running</span><span class=\"ds-status\"><svg width=\"12\" height=\"12\" viewBox=\"0 0 12 12\" style=\"color:#22C55E\"><circle cx=\"6\" cy=\"6\" r=\"4.5\" fill=\"currentColor\"/></svg>done</span><span class=\"ds-status\"><svg width=\"12\" height=\"12\" viewBox=\"0 0 12 12\" style=\"color:#EF4444\"><circle cx=\"6\" cy=\"6\" r=\"4.5\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.5\"/><path d=\"M 3.75 3.75 L 8.25 8.25 M 8.25 3.75 L 3.75 8.25\" stroke=\"currentColor\" stroke-width=\"1.5\"/></svg>failed</span><span class=\"ds-status\"><svg width=\"12\" height=\"12\" viewBox=\"0 0 12 12\" style=\"color:#52525B\"><circle cx=\"6\" cy=\"6\" r=\"4.5\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.5\" stroke-dasharray=\"2 2\"/></svg>skipped</span><span class=\"ds-status\"><svg width=\"12\" height=\"12\" viewBox=\"0 0 12 12\" style=\"color:#52525B\"><circle cx=\"6\" cy=\"6\" r=\"1.5\" fill=\"currentColor\"/></svg>n/a</span></div>",
+      "css": ".ds-marks { display: flex; flex-wrap: wrap; gap: 16px; padding: 8px 12px; background: var(--bg, #09090B); } .ds-status { display: inline-flex; align-items: center; gap: 6px; font: 400 12px/16px 'Geist Mono', ui-monospace, monospace; color: var(--muted, #85858F); } .ds-status svg { flex-shrink: 0; } @keyframes ds-breathe { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } } .ds-mark-running { animation: ds-breathe 1.6s cubic-bezier(0.4, 0, 0.2, 1) infinite; } @media (prefers-reduced-motion: reduce) { .ds-mark-running { animation: none; } }"
+    },
+    {
+      "name": "Step Row",
+      "kind": "card",
+      "refersTo": "step-row",
+      "description": "One plan step as a dense row on the obsidian ground: mark, mono id, skill, chips, right-aligned metric and elapsed; goal and model below; dependencies and outcome last. Hover and selected lift to surface.",
+      "html": "<button class=\"ds-step\"><div class=\"ds-step-head\"><svg width=\"12\" height=\"12\" viewBox=\"0 0 12 12\" class=\"ds-mark-running\" style=\"color:#F97316\"><circle cx=\"6\" cy=\"6\" r=\"4.5\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.5\"/><path d=\"M 6 1.5 A 4.5 4.5 0 0 1 6 10.5 Z\" fill=\"currentColor\"/></svg><span class=\"ds-step-id\">train_gbm</span><span class=\"ds-step-skill\">train-tabular</span><span class=\"ds-step-right\"><span><span class=\"ds-muted\">f1 </span><span class=\"ds-fg\">0.8412</span></span><span class=\"ds-step-elapsed\">1m42s</span></span></div><div class=\"ds-step-line\"><p class=\"ds-step-goal\">Fit a gradient-boosted model on data/processed/features.parquet; log f1 on the holdout.</p><span class=\"ds-step-model\">ollama_chat/qwen2.5:14b</span></div><div class=\"ds-step-tail\"><span class=\"ds-chip\">&larr; features</span><span class=\"ds-chip\">&larr; split</span></div></button>",
+      "css": ".ds-step { display: block; width: 100%; padding: 8px 12px; border: 0; border-bottom: 1px solid var(--line, #27272A); background: var(--bg, #09090B); color: var(--fg, #E4E4E7); text-align: left; cursor: pointer; font-family: 'Geist', ui-sans-serif, system-ui, sans-serif; transition: background-color 150ms; } .ds-step:hover, .ds-step:focus-visible { background: var(--surface, #18181B); } .ds-step:focus-visible { outline: 1.5px solid var(--orange, #F97316); outline-offset: 1px; border-radius: 2px; } .ds-step-head { display: flex; align-items: center; gap: 8px; } .ds-step-id { font: 500 14px/20px 'Geist Mono', ui-monospace, monospace; color: var(--fg, #E4E4E7); } .ds-step-skill { font: 400 12px/16px 'Geist', ui-sans-serif, system-ui, sans-serif; color: var(--muted, #85858F); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; } .ds-step-right { display: flex; align-items: center; gap: 12px; margin-left: auto; flex-shrink: 0; font: 400 12px/16px 'Geist Mono', ui-monospace, monospace; font-variant-numeric: tabular-nums; } .ds-muted { color: var(--muted, #85858F); } .ds-fg { color: var(--fg, #E4E4E7); } .ds-step-elapsed { color: var(--orange, #F97316); } .ds-step-line { display: flex; align-items: flex-start; gap: 8px; margin-top: 4px; padding-left: 20px; font-size: 12px; line-height: 16px; } .ds-step-goal { margin: 0; flex: 1; min-width: 0; color: var(--muted, #85858F); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; transition: color 150ms; } .ds-step:hover .ds-step-goal { color: rgba(228,228,231,0.8); } .ds-step-model { flex-shrink: 0; font: 400 11px/16px 'Geist Mono', ui-monospace, monospace; color: var(--muted, #85858F); } .ds-step-tail { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: 4px; padding-left: 20px; } .ds-chip { display: inline-flex; align-items: center; padding: 1px 6px; border: 1px solid var(--line, #27272A); border-radius: 2px; font: 400 11px/16px 'Geist Mono', ui-monospace, monospace; color: var(--muted, #85858F); } @keyframes ds-breathe { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } } .ds-mark-running { animation: ds-breathe 1.6s cubic-bezier(0.4, 0, 0.2, 1) infinite; } @media (prefers-reduced-motion: reduce) { .ds-mark-running { animation: none; } }"
+    },
+    {
+      "name": "Graph Node",
+      "kind": "custom",
+      "refersTo": "graph-node",
+      "description": "A step in the dependency graph: 150x34 surface rect with a 2px radius, hairline stroke (orange while running or selected), a 4.5px status mark and the id in 11.5px mono. Edges are cubic curves in rule-strong, orange when feeding a running step.",
+      "html": "<svg width=\"370\" height=\"50\" viewBox=\"0 0 370 50\" role=\"img\" aria-label=\"dependency graph\"><path d=\"M 158 25 C 184 25, 194 25, 220 25\" fill=\"none\" stroke=\"#F97316\" stroke-width=\"1.5\"/><g transform=\"translate(8 8)\"><rect width=\"150\" height=\"34\" rx=\"2\" fill=\"#18181B\" stroke=\"#27272A\" stroke-width=\"1\"/><circle cx=\"14\" cy=\"17\" r=\"4.5\" fill=\"#22C55E\" stroke=\"#22C55E\" stroke-width=\"1.5\"/><text x=\"26\" y=\"21\" font-family=\"'Geist Mono', ui-monospace, monospace\" font-size=\"11.5\" fill=\"#E4E4E7\">features</text></g><g transform=\"translate(220 8)\"><rect width=\"150\" height=\"34\" rx=\"2\" fill=\"#18181B\" stroke=\"#F97316\" stroke-width=\"1\" stroke-opacity=\"0.6\"/><circle cx=\"14\" cy=\"17\" r=\"4.5\" fill=\"none\" stroke=\"#F97316\" stroke-width=\"1.5\"/><path d=\"M 14 12.5 A 4.5 4.5 0 0 1 14 21.5 Z\" fill=\"#F97316\"/><text x=\"26\" y=\"21\" font-family=\"'Geist Mono', ui-monospace, monospace\" font-size=\"11.5\" fill=\"#E4E4E7\">train_gbm</text></g></svg>",
+      "css": "svg { display: block; max-width: 100%; height: auto; background: var(--bg, #09090B); }"
+    }
+  ],
+  "narrative": {
+    "northStar": "The Operator's Console",
+    "overview": "BeyondML's console is a dark instrument panel for watching autonomous agents do work, not a dashboard for summarising it. The plan graph is the page. Every agent opens to the literal instruction it was given, then to its live stream of tool calls, then to what it wrote. The visual system exists to make that legible at a glance in a dark room: an obsidian ground, panels one tone lighter, 1px hairlines between regions, and a single orange that means \"this is happening now\" or \"this is what you have selected\". PRODUCT.md's one durable constraint on the visual layer holds throughout: every visible element carries data or enables action.\n\nDensity comes from type, not chrome. Nearly everything is set at 12px; identifiers, numbers, timestamps, paths, events and code are in Geist Mono with tabular figures, so a row of steps or a ledger table reads like a well-formatted terminal. Status is never a coloured pill; it is a small drawn mark (ring, half-disc, disc, cross, dotted ring) in a fixed six-colour vocabulary that the terminal client shares glyph-for-glyph, and the mark alone carries the colour; the word beside it stays muted. Green and red exist only inside those readings; every cue that asks the operator to act (a waiting prompt, a retry, a question or approval marker, a budget line) is orange. The restraint is the point: when something turns orange, the operator looks.\n\nThe system is flat. Depth is tonal (obsidian under surface), separation is a hairline, and the only shadow in the product sits under the approval modal, the one moment the console asks the operator to decide. Motion is likewise rationed to one authored gesture, the running mark breathing, plus skeleton shimmer and a 180ms modal entrance; everything else is a 150ms colour transition that prefers-reduced-motion switches off.",
+    "keyCharacteristics": [
+      "Obsidian ground (#09090B), surface panels (#18181B), hairline rules (#27272A); no gradients, no shadows outside the modal",
+      "One accent (#F97316) carrying running, selected, focus, caret, text selection, the primary button and the lead agent's voice",
+      "Green and red live only in drawn status marks and verdict readings (tool results, exit codes, errors); every cue that needs the operator is orange; no yellow, cyan or violet",
+      "Geist at 12–14px for labels and prose; Geist Mono for every id, number, path, event and code block, tabular figures on",
+      "A flat type ramp (16 / 14 / 12 / 11) with weight 500 as the only emphasis",
+      "2px corners on every control, 1px borders everywhere, 28px controls, 32px panel titles, 40px top bar",
+      "Regions split by hairlines into fixed-height chrome and a scrolling body; the lead-agent dock is pinned under every project screen"
+    ],
+    "rules": [
+      { "name": "The One Orange Rule", "body": "Orange is the only accent and it means \"now\", \"yours\" or \"needs you\": running, selected, focused, primary, and every prompt, retry or budget cue that waits on the operator. A second accent, an orange panel tint, or orange decoration is out of the system.", "section": "colors" },
+      { "name": "The Status-Only Rule", "body": "Green and red appear only as a status reading: a drawn mark, a tool-result verdict, an exit code, an answer, an error line, or the danger button that would stop or deny. The status word itself stays muted; the mark carries the colour. There is no yellow, cyan or violet in the system.", "section": "colors" },
+      { "name": "The Series Rule", "body": "Charts take colours from the fixed series in order — orange, then zinc neutrals (#A1A1AA, #71717A, #E4E4E7, #D4D4D8, #52525B) — on a transparent paper with a hairline y grid, no x grid, and rule-strong axes. Bars fill with chart ink at 35% under a 1px chart-ink line.", "section": "colors" },
+      { "name": "The Half-Tone Border Rule", "body": "A coloured border on a chip or secondary button is the colour at 40–60% opacity (border-orange/40 on a chip, border-orange/60 on the waiting badge and the recommended option, border-danger/50–60). Full-strength coloured borders are reserved for the modal frame, the primary button, the running or selected graph node, and the scroll-back pill.", "section": "colors" },
+      { "name": "The Mono-for-Data Rule", "body": "Anything an operator might copy, compare or count — an id, a number, a timestamp, a path, a model name, an event, a tool call, code — is set in Geist Mono with tabular figures. Geist is for labels and sentences.", "section": "typography" },
+      { "name": "The Twelve-Pixel Rule", "body": "The console's working size is 12px. Sizes go to 14px for the thing the panel is about and 16px exactly once. Hierarchy comes from mono versus sans, 500 versus 400, and foreground versus muted, not from scale.", "section": "typography" },
+      { "name": "The Hairline Rule", "body": "Regions, rows and panel titles separate by a 1px #27272A rule. No gaps, no cards, no shadows between them.", "section": "layout" },
+      { "name": "The Fixed-Chrome Rule", "body": "Chrome has fixed heights — 40px top bar, 32px panel title, 36px dock header, 28px for every control — and content scrolls beneath it inside min-h-0 flex-1 overflow-auto.", "section": "layout" },
+      { "name": "The One Shadow Rule", "body": "The only shadow in the product is the approval modal's. Every other surface is flat; depth is obsidian under surface and a hairline between.", "section": "elevation" },
+      { "name": "The Inverse-Layer Rule", "body": "The selected or active thing takes the other tone from its container: a row on the obsidian ground rises to surface; a tab or field inside surface chrome drops to obsidian.", "section": "elevation" },
+      { "name": "The 2px Rule", "body": "Corners are 2px or square. No pills, no 4px+ radii on controls, no circles except the drawn status marks.", "section": "shapes" }
+    ],
+    "dos": [
+      "Do draw status with the six-mark vocabulary at 1.5px stroke and STATUS_COLOR; the mark carries the colour and the word beside it stays muted mono.",
+      "Do set every id, number, timestamp, path, model, event and code block in Geist Mono with tabular-nums.",
+      "Do separate regions and rows with a 1px #27272A hairline, and use #3F3F46 only for graph edges, chart axes and scrollbars.",
+      "Do keep readable text at #85858F or lighter; drop prose to 90% or 80% foreground, never to a darker grey.",
+      "Do use the 28px control, 32px panel title and 40px top bar heights, with 12px side padding and 2px corners.",
+      "Do show a keyboard shortcut as a kbd chip beside the control it fires.",
+      "Do write empty states as a dashed hairline box that says what will appear and when.",
+      "Do render charts through Plot so the palette, fonts, grid and hidden modebar carry.",
+      "Do keep the lead-agent dock pinned beneath every project screen."
+    ],
+    "donts": [
+      "Don't introduce a second accent or tint a panel orange; orange is text, a 1px border, a mark, the caret, the selection, or the one filled button.",
+      "Don't cast a shadow anywhere but the approval modal.",
+      "Don't use a radius other than 2px (or square for the modal); no pills.",
+      "Don't use green or red for anything but a status reading, and don't bring in yellow, cyan or violet; a cue that needs the operator is orange.",
+      "Don't build metric tiles or KPI cards; metrics are mono table rows or inline label value pairs.",
+      "Don't add display sizes, uppercase tracking, or weights other than 400 and 500.",
+      "Don't add animation beyond the breathing running mark, the skeleton shimmer, the 180ms modal entrance and 150ms colour transitions; respect prefers-reduced-motion.",
+      "Don't use icon fonts or decorative icons; the only icons are the status marks and 8–10px inline-SVG disclosure chevrons."
+    ]
+  }
+}

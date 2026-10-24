@@ -2,9 +2,10 @@
 BeyondML CLI — entry point for the terminal-native AutoML platform.
 
 Usage:
-    beyondml                          Launch the interactive TUI (legacy, until the new TUI lands)
+    beyondml [--project DIR]          Open the TUI on a project, with the gateway in-process
     beyondml init [DIR] --goal TEXT   Create a BeyondML project folder
     beyondml run [GOAL] --data PATH   Plan and build an ML project headless, printing every agent event
+    beyondml serve                    Run the gateway headless (REST, SSE, web UI)
     beyondml benchmark                Run PMLB benchmark suite
     beyondml --version                Show version
 """
@@ -18,31 +19,57 @@ from pathlib import Path
 import click
 
 
-def _launch_tui():
-    # Ensure the project root is on sys.path so tui_app.py can import beyondml
-    project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-    if project_root not in sys.path:
-        sys.path.insert(0, project_root)
+TUI_OPTIONS = [
+    click.option("--project", "project_dir", default=".", show_default=True, type=click.Path(file_okay=False)),
+    click.option("--port", default=7777, show_default=True, help="Gateway port for the web UI."),
+    click.option("--no-serve", is_flag=True, default=False, help="Do not start the gateway alongside the TUI."),
+    click.option("--mode", type=click.Choice(["ask", "auto", "autonomous"]), default=None),
+    click.option("--model", default=None, help="Model for every agent, e.g. ollama_chat/qwen2.5:14b."),
+]
 
-    # Import here to avoid heavy imports on --help
-    from tui_app import BeyondMLApp
 
-    BeyondMLApp().run()
+def tui_options(f):
+    for option in reversed(TUI_OPTIONS):
+        f = option(f)
+    return f
+
+
+def _launch_tui(project_dir, port, no_serve, mode, model):
+    from beyondml.tui.app import BeyondMLApp
+
+    session = _open_session(project_dir, mode=mode, model=model)
+    server = url = None
+    if not no_serve:
+        from beyondml.gateway.app import create_app
+        from beyondml.gateway.serve import BackgroundServer
+
+        try:
+            server = BackgroundServer(create_app({session.name: session}), port=port).start()
+            url = server.url
+        except RuntimeError as e:
+            click.echo(f"gateway not started ({e}); the TUI runs alone", err=True)
+    try:
+        BeyondMLApp(session, gateway_url=url).run()
+    finally:
+        if server:
+            server.stop()
 
 
 @click.group(invoke_without_command=True)
 @click.version_option(version="0.1.0", prog_name="beyondml")
+@tui_options
 @click.pass_context
-def main(ctx):
-    """BeyondML — AI Agent Orchestration Platform for AutoML."""
+def main(ctx, project_dir, port, no_serve, mode, model):
+    """BeyondML: an ML-engineering agent harness. With no command, opens the TUI on the current project."""
     if ctx.invoked_subcommand is None:
-        _launch_tui()
+        _launch_tui(project_dir, port, no_serve, mode, model)
 
 
 @main.command()
-def tui():
-    """Launch the interactive TUI application."""
-    _launch_tui()
+@tui_options
+def tui(project_dir, port, no_serve, mode, model):
+    """Open the interactive TUI (the same as running beyondml with no command)."""
+    _launch_tui(project_dir, port, no_serve, mode, model)
 
 
 @main.command()
@@ -148,29 +175,31 @@ def benchmark(datasets):
     asyncio.run(runner.run_benchmark())
 
 
+def _open_session(project_dir, **kw):
+    """A Session on an existing project, or exit 2 with the init hint."""
+    from beyondml.gateway.session import Session
+
+    root = Path(project_dir)
+    if not (root / ".beyondml").is_dir():
+        click.echo(f"{root.resolve()} is not a BeyondML project. Run `beyondml init` there first.", err=True)
+        sys.exit(2)
+    return Session(root, **kw)
+
+
 @main.command()
-@click.option("--port", default=7777, show_default=True, help="Port for the web server.")
-@click.option("--no-browser", is_flag=True, default=False, help="Don't open browser automatically.")
-def web(port, no_browser):
-    """Launch the BeyondML Web UI (FastAPI + React)."""
-    import threading
-    import time
-    import webbrowser
-    import uvicorn
+@click.option("--project", "project_dir", default=".", show_default=True, type=click.Path(file_okay=False))
+@click.option("--host", default="127.0.0.1", show_default=True, help="Bind address; loopback by default.")
+@click.option("--port", default=7777, show_default=True)
+@click.option("--mode", type=click.Choice(["ask", "auto", "autonomous"]), default=None)
+@click.option("--model", default=None, help="Model for every agent, e.g. ollama_chat/qwen2.5:14b.")
+def serve(project_dir, host, port, mode, model):
+    """Run the gateway headless: REST, SSE events and the web UI for one project."""
+    from beyondml.gateway.app import create_app
+    from beyondml.gateway.serve import run_foreground
 
-    def _open():
-        time.sleep(1.5)
-        if not no_browser:
-            webbrowser.open(f"http://localhost:{port}")
-
-    threading.Thread(target=_open, daemon=True).start()
-    uvicorn.run(
-        "beyondml.web.server:app",
-        host="0.0.0.0",
-        port=port,
-        reload=False,
-        log_level="info",
-    )
+    session = _open_session(project_dir, mode=mode, model=model)
+    click.echo(f"BeyondML gateway on http://{host}:{port} for {session.project.root.resolve()}")
+    run_foreground(create_app({session.name: session}), host, port)
 
 
 if __name__ == "__main__":

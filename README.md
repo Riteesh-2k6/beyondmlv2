@@ -61,7 +61,7 @@ pip install -e ".[dev]"
 ## 🏗️ Architecture
 
 ```
-tui_app.py                   ← Textual TUI (3-column pipeline screen)
+beyondml/tui/                ← Textual TUI (plan board, agent screens, chat, approvals, experiments, files)
 beyondml/
 ├── cli.py                   ← CLI entry point (beyondml run / benchmark)
 ├── state.py                 ← MLState — shared pipeline state
