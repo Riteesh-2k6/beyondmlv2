@@ -1,4 +1,5 @@
 import json
+from types import SimpleNamespace
 
 import pytest
 
@@ -77,8 +78,10 @@ async def test_ask_user_asks(tmp_path):
 
 async def test_finish_step_sets_outcome(tmp_path):
     env = mk(tmp_path)
-    tools(control_tools(env))["finish_step"]("done", ["a.txt"])
+    ctx = SimpleNamespace(actions=SimpleNamespace(skip_summarization=False))
+    tools(control_tools(env))["finish_step"]("done", ["a.txt"], ctx)
     assert env.outcome.finished and env.outcome.summary == "done" and env.outcome.outputs == ["a.txt"]
+    assert ctx.actions.skip_summarization  # the turn ends here
 
 
 def plan(steps):
@@ -86,7 +89,8 @@ def plan(steps):
 
 
 def step(id, deps=(), status="pending"):
-    return {"id": id, "skill": "eda", "goal": "x", "depends_on": list(deps), "status": status}
+    return {"id": id, "skill": "eda", "goal": "x", "depends_on": list(deps), "status": status,
+            "success_check": {"expects": [f"reports/{id}.md"]}}
 
 
 async def test_update_plan_rejects_invalid(tmp_path):

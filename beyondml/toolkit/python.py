@@ -110,13 +110,25 @@ def run_script(project: Project, script: str, args: list[str], timeout: int, *, 
         return _fail(str(e))
     if path.suffix != ".py" or not path.is_file():
         return _fail(f"script must be an existing .py file: {script}")
+    return _run(project, [python, str(path), *args], rel, args, timeout, agent=agent, bus=bus)
+
+
+def run_module(project: Project, module: str, args: list[str], timeout: int, *, agent: str,
+               bus: EventBus | None = None, python: str = sys.executable) -> dict:
+    """`python -m module args` in the project, with run_script's clean environment, timeout and ledger record."""
+    return _run(project, [python, "-m", module, *args], f"-m {module}", args, timeout, agent=agent, bus=bus)
+
+
+def _run(project: Project, argv: list[str], rel: str, args: list[str], timeout: int, *, agent: str,
+         bus: EventBus | None) -> dict:
+    root = project.root.resolve()
     run_id = uuid.uuid4().hex[:8]
     metrics_path = root / ".beyondml" / "runs" / run_id / "metrics.json"
     metrics_path.parent.mkdir(parents=True, exist_ok=True)
     env = {**clean_env(os.environ), "BEYONDML_METRICS": str(metrics_path)}
     before = _snapshot(root)
     try:
-        code, timed_out, out, err, seconds = _spawn([python, str(path), *args], root, env, max(1, min(timeout, 3600)),
+        code, timed_out, out, err, seconds = _spawn(argv, root, env, max(1, min(timeout, 3600)),
                                                    metrics_path.parent / "stdout.txt", metrics_path.parent / "stderr.txt")
     except OSError as e:
         return _fail(str(e))

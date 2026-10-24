@@ -12,6 +12,7 @@ from beyondml.harness.skills import SkillInfo, knowledge_toolset, step_skills
 from beyondml.toolkit.control import control_tools
 from beyondml.toolkit.env import Asker, StepOutcome, ToolEnv
 from beyondml.toolkit.files import file_tools
+from beyondml.toolkit.ml import ml_tools
 from beyondml.toolkit.python import python_tools
 from beyondml.toolkit.registry import build_tools
 from beyondml.workspace.events import EventBus
@@ -37,6 +38,7 @@ def _instruction(project: Project, plan: Plan, step: Step, skill: SkillInfo) -> 
         parts.append(f"## Previous attempt failed\n{step.last_failure}")
     parts += [
         f"## Project\n{project.read('PROJECT.md')}",
+        f"## Data\n{project.read('DATA.md')}",  # the real column names; small models otherwise guess famous ones
         f"## Memory\n{project.read('MEMORY.md')}",
         f"## How to do this step\n{skill.body}",
         f"## Rules\n{RULES}",
@@ -52,7 +54,8 @@ def build_step_agent(project: Project, bus: EventBus, plan: Plan, step: Step, sk
     project.write(f"agents/{step.id}/instruction.md", instruction)
     env = ToolEnv(project, bus, agent=step.id, mode=mode, asker=asker, skill_names=set(step_skills(skills)),
                   outcome=outcome, on_touch=on_touch)
-    tools = build_tools(env, file_tools(env) + python_tools(env) + control_tools(env), allowed=skill.allowed_tools)
+    tools = build_tools(env, file_tools(env) + python_tools(env) + control_tools(env) + ml_tools(env),
+                        allowed=skill.allowed_tools)
     knowledge = knowledge_toolset(skills)
     return LlmAgent(name=step.id, model=resolver(step.id, step.model or skill.model_hint),
                     instruction=instruction, tools=tools + ([knowledge] if knowledge else []))

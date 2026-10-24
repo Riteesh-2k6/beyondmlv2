@@ -95,7 +95,9 @@ def format_event(ev: dict) -> str | None:
     elif kind == "tool_result":
         resp = data.get("response")
         failed = isinstance(resp, dict) and (resp.get("ok") is False or "error" in resp)
-        detail = (resp.get("error") or resp.get("errors")) if failed else None
+        if failed:  # a failed script has no "error": show its last stderr line, else its exit code
+            tail = (resp.get("stderr_tail") or "").strip().splitlines()
+            detail = resp.get("error") or resp.get("errors") or (tail[-1] if tail else f"exit {resp.get('exit_code')}")
         short = f"{data.get('name')} error: {str(detail)[:100]}" if failed else f"{data.get('name')} ok"
     elif kind == "step_status":
         short = f"{data.get('id')} {data.get('status')}" + (f" — {data['reason']}" if data.get("reason") else "")
@@ -136,7 +138,7 @@ async def _approve(payload: dict) -> bool:
 @click.option("--project", "project_dir", default=".", show_default=True, type=click.Path(file_okay=False))
 @click.option("--mode", type=click.Choice(["ask", "auto", "autonomous"]), default=None,
               help="ask: confirm every run; auto: confirm installs and network; autonomous: never ask.")
-@click.option("--model", default=None, help="Model for every agent, e.g. ollama_chat/qwen2.5:14b.")
+@click.option("--model", default=None, help="Model for every agent, e.g. ollama_chat/qwen3:8b.")
 def run(goal, data, project_dir, mode, model):
     """Plan and build an ML project headless (resumes an unfinished plan when GOAL is omitted)."""
     from beyondml.harness.run import GoalRequired, run_goal
@@ -165,12 +167,9 @@ def run(goal, data, project_dir, mode, model):
 )
 def benchmark(datasets):
     """Run the PMLB benchmark suite."""
-    import asyncio
     from beyondml.engine.benchmarker import PMLBRunner
 
-    ds = list(datasets) if datasets else None
-    runner = PMLBRunner(datasets=ds)
-    asyncio.run(runner.run_benchmark())
+    PMLBRunner(datasets=list(datasets) or None).run_benchmark()
 
 
 def _open_session(project_dir, **kw):

@@ -28,7 +28,6 @@ dependencies = [
     "textual>=0.40",
     "plotext>=5.2",
     "python-dotenv>=1.0",
-    "groq>=0.4",
     "requests>=2.31",
     "pmlb>=1.0",
     "joblib>=1.3",
@@ -38,6 +37,8 @@ dependencies = [
     "nbformat>=5.0",
     "google-adk==2.12.0",
     "litellm>=1.106",
+    "mcp>=2.3",  # litellm imports it on every tool call but does not declare it
+    "pyarrow>=15",  # parquet: intake, the tools and the planner's example plan all use it
     "fastapi>=0.110",
     "uvicorn>=0.27",
     "python-multipart>=0.0.9",

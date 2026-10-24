@@ -8,6 +8,7 @@ import pandas as pd
 import pytest
 
 import beyondml.engine.fitness as fitness_mod
+import beyondml.engine.pipeline as pipeline_mod
 from beyondml.engine.evolve import Budget, Fidelity
 from beyondml.engine.fitness import (
     DEFAULT_MODELS, MODELS, TabularFitness, default_ladder, evolve_tabular, tabular_space, warm_seeds,
@@ -158,8 +159,8 @@ def test_default_ladder():
 
 def test_screen_effort_caps_trees(monkeypatch, classification_df, classification_profile):
     seen = []
-    real = fitness_mod._make_model
-    monkeypatch.setattr(fitness_mod, "_make_model",
+    real = pipeline_mod.make_model
+    monkeypatch.setattr(pipeline_mod, "make_model",
                         lambda name, c, hp, w: seen.append(hp.get("n_estimators")) or real(name, c, hp, w))
     X, y = _split(classification_df)
     fit = TabularFitness(X, y, "classification", classification_profile)

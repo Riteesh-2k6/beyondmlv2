@@ -22,7 +22,8 @@ SKILLS = {"python-step": SkillInfo("python-step", "Generic step.", "step", None,
 
 def plan(*ids, skill="python-step"):
     return {"goal": "g", "metric": "f1", "budget": {},
-            "steps": [{"id": i, "skill": skill, "goal": f"do {i}"} for i in ids]}
+            "steps": [{"id": i, "skill": skill, "goal": f"do {i}", "success_check": {"expects": [f"{i}.md"]}}
+                      for i in ids]}
 
 
 async def ask(q):

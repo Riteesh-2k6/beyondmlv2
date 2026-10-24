@@ -1,8 +1,8 @@
 # 🚀 BeyondML
 
-**AI Agent Orchestration Platform — Terminal-native AutoML with LLM-powered agents and Genetic Algorithm optimization.**
+**An ML-engineering agent harness: give it data and a goal, and it plans the project, runs one agent per plan step, and ships a repo you can train and predict with.**
 
-BeyondML is an autonomous machine learning pipeline that uses multiple specialized AI agents (EDA, Feature Engineering, GA Optimization, Reflection) orchestrated through an LLM to profile, preprocess, train, and evaluate models — all from a beautiful terminal UI.
+BeyondML is built on Google ADK. A planner turns your goal and data into a plan; each step (audit, clean, EDA, features, model search, export, evaluation) gets its own agent, instructed by a skill and limited to typed tools. Hyperparameter search is a genetic algorithm (or Optuna). Every agent's instructions and live activity are visible in the terminal UI and the web UI.
 
 ---
 
@@ -12,7 +12,7 @@ Building machine learning pipelines is traditionally a tedious, manually iterati
 
 ## 💡 Approach
 
-BeyondML addresses this by combining the reasoning capabilities of LLMs with a highly observable, terminal-native UI. We use a multi-agent orchestration architecture where specialized AI agents (EDA, Feature Engineering, Outlier Handling, and Reflection) communicate to systematically process data. By pairing LLM-driven feature engineering with rigorous, non-LLM Genetic Algorithms for optimization, the platform balances intelligent heuristics with mathematical precision—all completely transparent to the user via the TUI.
+BeyondML addresses this by combining the reasoning capabilities of LLMs with a highly observable, terminal-native UI. A planner splits the goal into steps and one agent per step (audit, cleaning, EDA, features, model search, evaluation) works through a shared project folder, so every decision and file is on disk. By pairing LLM-driven feature engineering with rigorous, non-LLM Genetic Algorithms for optimization, the platform balances intelligent heuristics with mathematical precision—all completely transparent to the user via the TUI.
 
 ## 🔄 Iterations
 
@@ -21,11 +21,12 @@ BeyondML addresses this by combining the reasoning capabilities of LLMs with a h
 3. **V3 (Autonomous Agents):** Integrated Groq and local Ollama. Added LLM-driven EDA, Outlier, and Feature Engineering agents for autonomous data preparation.
 4. **V4 (Unsupervised & Visualizations):** Added support for PCA, DBSCAN, KMeans, and interactive Plotly charts to supplement terminal-native rendering.
 5. **V5 (Performance & Workflow):** Parallelized agent execution using `asyncio` to drastically reduce processing bottlenecks and exposed customizable settings like dynamic train/test splits.
+6. **V6 (Agent harness):** Rebuilt on Google ADK: a planner, one agent per plan step driven by SKILL.md skills, evolution engine v2, standalone exported code, and a gateway serving the Textual TUI and the web UI. The fixed V1–V5 agent pipeline is retired.
 
 ## 📐 Key Design Choices
 
 - **Terminal-Native TUI:** Built using `Textual` and `plotext` rather than a standard web interface to offer developers immediate, lightweight accessibility without managing frontend/backend server states.
-- **Micro-Agent Architecture:** Separated the LLM capabilities into modular, single-responsibility agents (EDA, Leakage, Sanity, Feature, Reflection). This allows parallel execution, improves context utilization, and makes the pipeline's logic highly debuggable.
+- **One agent per plan step:** each step's agent gets its goal, a skill (SKILL.md) and only the tools that skill allows; independent steps run in parallel, and a step passes only when its success check (files, a script run, or a metric) holds.
 - **Hybrid Optimization:** Leveraged LLMs strictly for qualitative decisions (feature generation, sanity checks) and evolutionary search (Genetic Algorithms) for exact, quantitative tasks (hyperparameter tuning).
 
 ## ⏱️ Daily Time Commitment
@@ -45,8 +46,8 @@ pipx install git+https://github.com/Riteesh-2k6/beyondml.git
 # Alternative (standard pip):
 pip install git+https://github.com/Riteesh-2k6/beyondml.git
 
-# Launch the TUI immediately
-beyondml run
+# Create a project and open the TUI on it
+beyondml init my-project && cd my-project && beyondml
 ```
 
 If you want to contribute or modify the code locally instead:
@@ -61,38 +62,26 @@ pip install -e ".[dev]"
 ## 🏗️ Architecture
 
 ```
-beyondml/tui/                ← Textual TUI (plan board, agent screens, chat, approvals, experiments, files)
 beyondml/
-├── cli.py                   ← CLI entry point (beyondml run / benchmark)
-├── state.py                 ← MLState — shared pipeline state
-├── charts.py                ← Plotext chart rendering
-├── llm/
-│   ├── base.py              ← Abstract LLMProvider
-│   ├── groq_provider.py     ← Groq cloud LLM
-│   └── ollama_provider.py   ← Ollama local LLM
-├── engine/
-│   ├── profiler.py          ← DatasetProfiler + TargetIdentifier + ORI
-│   ├── supervised.py        ← SupervisedPipeline (baselines + final)
-│   ├── unsupervised.py      ← UnsupervisedPipeline (KMeans, DBSCAN, PCA)
-│   ├── genetic.py           ← Genome + GeneticModelOptimizer
-│   ├── metrics.py           ← Classification & regression metrics
-│   └── benchmarker.py       ← PMLB benchmark runner
-└── agents/
-    ├── orchestrator.py      ← LLM-powered path router
-    ├── eda_agent.py         ← Exploratory Data Analysis
-    ├── outlier_agent.py     ← Outlier detection & handling
-    ├── feature_agent.py     ← LLM feature engineering
-    ├── ga_trainer.py        ← GA evolution + TUI progress
-    ├── evaluator_agent.py   ← Final model evaluation + narration
-    └── reflection_agent.py  ← Iterative improvement loop
+├── cli.py              ← beyondml init / run / serve / tui / benchmark
+├── harness/            ← ADK glue (models, rate limits), intake, planner, lead, step-agent factory, executor
+├── toolkit/            ← typed agent tools: files, run_python, control (ask_user, finish_step), ML tools
+├── skills/             ← SKILL.md step skills (tabular-audit … tabular-export, evaluate-explain) and knowledge skills
+├── engine/             ← evolve (GA) + tune (Optuna), fitness, pipeline builder, export, checks, assess, clustering, MLP
+├── workspace/          ← project folder, plan.json, event bus, ledger
+├── gateway/            ← FastAPI + SSE over a run session (`beyondml serve`)
+├── tui/                ← Textual app: plan board, agent screens, chat, approvals, experiments, files
+└── web/                ← web UI over the gateway
 ```
 
-### Agent Pipeline Flow
+### How a run flows
 
 ```
-Dataset → Orchestrator → EDA Agent → Outlier Agent → Feature Agent
-       → GA Trainer → Evaluator → Reflection Agent → (loop or finish)
+data + goal → intake (DATA.md) → planner (plan.json) → one agent per step, in dependency order
+           → each step's success check → src/pipeline.py, train.py, predict.py, models/model.joblib
 ```
+
+The exported `src/` code never imports BeyondML.
 
 ---
 
@@ -115,10 +104,20 @@ The `docker-compose.yml` is pre-configured to point `OLLAMA_HOST` to `http://hos
 ### TUI (Interactive)
 
 ```bash
-beyondml run
+beyondml init my-project
+cd my-project
+beyondml
 ```
 
-Launches the full interactive pipeline with dataset selection, agent orchestration, and real-time progress.
+Opens the TUI on the project (and the gateway for the web UI on port 7777).
+
+### Headless
+
+```bash
+beyondml run "predict survival" --data data/titanic.csv --project my-project --mode autonomous
+```
+
+`--mode` is `ask` (confirm every script run), `auto` (confirm installs and network) or `autonomous` (never ask). `beyondml serve` runs the gateway and web UI without the TUI.
 
 ### Benchmark (PMLB)
 
@@ -134,12 +133,10 @@ beyondml benchmark -d adult -d iris
 
 Create a `.env` file:
 
-```env
-# LLM Provider: "ollama" (default) or "groq"
-LLM_PROVIDER=ollama
+Any LiteLLM model string works with `--model` or the project's `[model] default` (default: `ollama_chat/qwen3:8b` on a local Ollama). Hosted providers read their usual key from the environment, for example:
 
-# Required only if using Groq
-GROQ_API_KEY=your-api-key-here
+```env
+GROQ_API_KEY=your-api-key-here   # for --model groq/openai/gpt-oss-120b
 ```
 
 ---
@@ -162,9 +159,10 @@ pytest tests/ -v --cov=beyondml --cov-report=term-missing
 |---------|---------|
 | `pandas` / `numpy` | Data manipulation |
 | `scikit-learn` | ML models & preprocessing |
-| `textual` | Terminal UI framework |
-| `plotext` | Terminal-native charts |
-| `groq` / `requests` | LLM providers (Groq / Ollama) |
+| `google-adk` / `litellm` | Agents and any LLM provider (Ollama, Groq, OpenAI, Gemini, …) |
+| `textual` / `fastapi` | Terminal UI and the gateway for the web UI |
+| `torch` | MLP model family |
+| `pyarrow` | Parquet data |
 | `pmlb` | Penn ML Benchmark datasets |
 | `click` | CLI framework |
 

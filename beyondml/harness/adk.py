@@ -1,6 +1,10 @@
 """Thin glue between BeyondML and Google ADK: models, sessions, and one agent turn."""
 from __future__ import annotations
 
+import asyncio
+import functools
+import logging
+import re
 from dataclasses import dataclass, field
 from typing import Callable
 
@@ -26,13 +30,56 @@ def default_resolver(project: Project) -> ModelResolver:
         name = requested or cfg["default"]
         if name.startswith("gemini"):
             return name
-        from google.adk.models.lite_llm import LiteLlm  # heavy import, only when a model is built
-
         if name.startswith("ollama"):
-            return LiteLlm(model=name, api_base=cfg["api_base"], num_retries=3)
-        return LiteLlm(model=name, num_retries=3)
+            return _llm_class()(model=name, api_base=cfg["api_base"], num_retries=3)
+        return _llm_class()(model=name, num_retries=3)
 
     return resolve
+
+
+RATE_LIMIT_WAITS = 10
+MAX_RATE_LIMIT_WAIT = 120.0  # a provider asking for longer is enforcing a quota, not a burst limit: fail fast
+log = logging.getLogger("beyondml")
+
+
+def _retry_after(error) -> float:
+    """Seconds the provider asked us to wait ("try again in 1m2.5s"), else 20."""
+    match = re.search(r"try again in (?:(\d+)m)?([\d.]+)s", str(error))
+    return 60 * int(match[1] or 0) + float(match[2]) if match else 20.0
+
+
+@functools.cache
+def _llm_class():
+    from google.adk.models.lite_llm import LiteLlm  # heavy import, only when a model is built
+    from litellm.exceptions import RateLimitError
+
+    class BeyondLlm(LiteLlm):
+        """LiteLlm that waits out rate limits (litellm's own retries do not wait) and suits Groq's history rules."""
+
+        async def generate_content_async(self, llm_request, stream=False):
+            if self.model.startswith("groq/"):  # Groq rejects `reasoning_content`, which ADK replays from thoughts
+                contents = []
+                for content in llm_request.contents:
+                    parts = [p for p in content.parts or [] if not p.thought]
+                    if parts:
+                        contents.append(content.model_copy(update={"parts": parts}))
+                llm_request = llm_request.model_copy(update={"contents": contents})
+            for attempt in range(RATE_LIMIT_WAITS + 1):
+                started = False
+                try:
+                    async for response in super().generate_content_async(llm_request, stream):
+                        started = True
+                        yield response
+                    return
+                except RateLimitError as error:
+                    wait = _retry_after(error)
+                    if started or attempt == RATE_LIMIT_WAITS or wait > MAX_RATE_LIMIT_WAIT:
+                        raise
+                    log.warning("%s rate-limited; waiting %.1fs (%d/%d)", self.model, wait, attempt + 1,
+                                RATE_LIMIT_WAITS)
+                    await asyncio.sleep(wait)
+
+    return BeyondLlm
 
 
 def session_service(project: Project) -> SqliteSessionService:

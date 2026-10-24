@@ -18,7 +18,8 @@ def make(*steps) -> Plan:
 
 
 def s(id, deps=(), skill="eda", goal="do it", **kw):
-    return {"id": id, "skill": skill, "goal": goal, "depends_on": list(deps), **kw}
+    return {"id": id, "skill": skill, "goal": goal, "depends_on": list(deps),
+            "success_check": {"expects": [f"reports/{id}.md"]}, **kw}
 
 
 def test_roundtrip(tmp_path):
@@ -34,7 +35,7 @@ def test_roundtrip(tmp_path):
 
 @pytest.mark.parametrize("mutation,needle", [
     ("dup_id", "duplicate"), ("bad_id", "identifier"), ("unknown_dep", "unknown dependency"),
-    ("cycle", "cycle"), ("unknown_skill", "unknown skill"), ("empty_goal", "goal")])
+    ("cycle", "cycle"), ("unknown_skill", "unknown skill"), ("empty_goal", "goal"), ("no_check", "success_check")])
 def test_validate_errors(mutation, needle):
     steps = {
         "dup_id": [s("a"), s("a")],
@@ -43,6 +44,8 @@ def test_validate_errors(mutation, needle):
         "cycle": [s("a", ["b"]), s("b", ["a"])],
         "unknown_skill": [s("a", skill="nope")],
         "empty_goal": [s("a", goal=" ")],
+        # an empty check passes on finish_step alone: qwen3:8b's clean step wrote clean.py, not clean.csv (10-24)
+        "no_check": [s("a", success_check={"run": None, "expects": [], "metric": None, "min": None})],
     }[mutation]
     errs = make(*steps).validate(SKILLS)
     assert any(needle in e for e in errs), errs

@@ -57,18 +57,3 @@ def regression_profile(regression_df):
     profiler = DatasetProfiler(regression_df, target_column="target")
     return profiler.run()
 
-
-class MockLLM:
-    """Mock LLM provider that returns pre-defined JSON."""
-    def __init__(self, responses=None):
-        self.responses = responses or {}
-        self.calls = []
-    def chat(self, messages, json_mode=False, **kwargs):
-        self.calls.append({"messages": messages, "json_mode": json_mode})
-        res = self.responses.get("default", "{}")
-        print(f"\n[MockLLM] Returning: {res}")
-        return res
-
-@pytest.fixture
-def mock_llm():
-    return MockLLM()
