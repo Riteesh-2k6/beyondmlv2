@@ -123,6 +123,9 @@ class Plan:
                 errs.append(f"step {st.id}: unknown skill {st.skill!r}")
             if not st.goal.strip():
                 errs.append(f"step {st.id}: empty goal")
+            sc = st.success_check
+            if not (sc.run or sc.expects or sc.metric):  # an empty check would pass on finish_step alone
+                errs.append(f"step {st.id}: success_check needs run, expects or a metric")
             for dep in st.depends_on:
                 if dep not in seen and dep not in {x.id for x in self.steps}:
                     errs.append(f"step {st.id}: unknown dependency {dep!r}")

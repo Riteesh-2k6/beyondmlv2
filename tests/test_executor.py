@@ -239,3 +239,14 @@ async def test_events_shape(tmp_path):
     for f in files:
         for line in f.read_text(encoding="utf-8").splitlines():
             assert set(json.loads(line)) == {"ts", "agent", "kind", "data"}
+
+
+async def test_finish_step_ends_the_turn(tmp_path):
+    # qwen3:8b kept calling finish_step (20 times in one turn) because the turn went on after it (acceptance 10-24)
+    project, bus, plan = make(tmp_path, step("a", expects=["out_a.csv"]))
+    (tmp_path / "out_a.csv").write_text("1")
+    ex = executor(project, bus, plan, {"a": [[[fc("finish_step", summary="done", outputs=["out_a.csv"])]]]},
+                  max_tool_calls=5)
+    result = await ex.run()
+    assert result.step("a").status == "done"
+    assert ex.resolver.models["a"][0].calls == 1

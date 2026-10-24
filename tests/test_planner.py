@@ -20,7 +20,8 @@ SKILLS = {"python-step": SkillInfo("python-step", "Generic step.", "step", None,
 
 
 def step(id, deps=(), goal="do it"):
-    return {"id": id, "skill": "python-step", "goal": goal, "depends_on": list(deps)}
+    return {"id": id, "skill": "python-step", "goal": goal, "depends_on": list(deps),
+            "success_check": {"expects": [f"reports/{id}.md"]}}
 
 
 def plan(*steps):

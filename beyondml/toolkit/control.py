@@ -3,6 +3,8 @@ from __future__ import annotations
 
 from typing import Callable
 
+from google.adk.tools import ToolContext
+
 from beyondml.toolkit.env import AUTONOMOUS_ANSWER, StepOutcome, ToolEnv
 from beyondml.workspace.plan import Plan, load_plan, save_plan
 
@@ -25,8 +27,8 @@ def control_tools(env: ToolEnv) -> list[Callable]:
             text += "\nOptions: " + " | ".join(options) + (f" (recommended: {recommended})" if recommended else "")
         return {"answer": await env.asker(text)}
 
-    def finish_step(summary: str, outputs: list[str]) -> dict:
-        """Declare this step finished.
+    def finish_step(summary: str, outputs: list[str], tool_context: ToolContext) -> dict:
+        """Declare this step finished. Your turn ends here.
 
         Args:
             summary: What was done, including any assumptions.
@@ -37,6 +39,7 @@ def control_tools(env: ToolEnv) -> list[Callable]:
         env.outcome.finished = True
         env.outcome.summary = summary
         env.outcome.outputs = list(outputs)
+        tool_context.actions.skip_summarization = True  # end the turn; small models otherwise call it again and again
         return {"ok": True}
 
     def update_plan(plan: dict) -> dict:
