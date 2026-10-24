@@ -22,3 +22,5 @@ coverage.xml
 
 # PMLB cache
 data/pmlb_cache/
+.impeccable/review/
+.impeccable/mocks/

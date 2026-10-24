@@ -4,28 +4,21 @@ export default {
   theme: {
     extend: {
       colors: {
-        obsidian:      '#09090B',
-        surface:       '#18181B',
-        'border-sub':  '#27272A',
-        muted:         '#71717A',
-        fg:            '#E4E4E7',
-        orange:        '#F97316',
-        'orange-dim':  '#7C3412',
-        success:       '#22C55E',
-        danger:        '#EF4444',
-        info:          '#22D3EE',
-        violet:        '#D946EF',
-        warn:          '#EAB308',
+        obsidian: '#09090B',
+        surface: '#18181B',
+        'border-sub': '#27272A',
+        muted: '#85858F', // ≥4.5:1 on both obsidian and surface
+        fg: '#E4E4E7',
+        orange: '#F97316',
+        success: '#22C55E',
+        danger: '#EF4444',
       },
       fontFamily: {
         mono: ['"Geist Mono"', 'ui-monospace', 'SFMono-Regular', 'monospace'],
-        sans: ['"Geist"',      'ui-sans-serif', 'system-ui', 'sans-serif'],
+        sans: ['"Geist"', 'ui-sans-serif', 'system-ui', 'sans-serif'],
       },
       fontSize: {
-        '2xs': ['0.65rem', { lineHeight: '1rem' }],
-      },
-      animation: {
-        'ping-slow': 'ping 1.8s cubic-bezier(0,0,0.2,1) infinite',
+        '2xs': ['0.6875rem', { lineHeight: '1rem' }],
       },
     },
   },
