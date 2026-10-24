@@ -8,19 +8,17 @@ from __future__ import annotations
 
 import asyncio
 import functools
-import importlib.util
 import json
 import re
-import sys
 import uuid
 from dataclasses import asdict
 from typing import Callable
 
 import numpy as np
 import pandas as pd
-from sklearn.model_selection import KFold, StratifiedKFold, cross_val_score, train_test_split
+from sklearn.model_selection import KFold, StratifiedKFold, cross_val_score
 
-from beyondml.engine.assess import assess, importance
+from beyondml.engine.assess import usable_rows
 from beyondml.engine.checks import detect_outliers as _outliers, drift as _drift, scan_leakage as _leakage
 from beyondml.engine.clustering import build_clusterer, cluster_spec, evolve_clusters
 from beyondml.engine.evolve import Budget
@@ -29,6 +27,7 @@ from beyondml.engine.fitness import TabularFitness, default_ladder, evolve_tabul
 from beyondml.engine.pipeline import build_ensemble, column_kinds, distinct_top
 from beyondml.engine.profiler import DatasetProfiler
 from beyondml.toolkit.env import ToolEnv
+from beyondml.toolkit.python import run_module
 
 SEARCH_KINDS = ("evolve", "tune")
 
@@ -130,16 +129,21 @@ def _raw(env: ToolEnv, raw: str) -> str:
     return f"data/raw/{files[0].name}"
 
 
-def _load_pipeline(env: ToolEnv, rel: str):
-    path = env.project.path(rel)
-    spec = importlib.util.spec_from_file_location(f"bml_pipeline_{uuid.uuid4().hex}", path)
-    module = importlib.util.module_from_spec(spec)
-    sys.path.insert(0, str(path.parent))  # src/mlp.py sits next to pipeline.py
-    try:
-        spec.loader.exec_module(module)
-    finally:
-        sys.path.remove(str(path.parent))
-    return module
+ASSESS_TIMEOUT = 900
+
+
+async def _out_of_process(env: ToolEnv, kind: str, pipeline: str, data: str, target: str, out: str, *extra) -> dict:
+    """evaluate and explain run the project's model code (which agents may edit) in a subprocess, as run_python does:
+    no harness secrets in its environment, a timeout, and nothing it does can take the gateway down."""
+    for rel in (pipeline, data):
+        env.project.path(rel)  # refuse paths outside the project before spawning anything
+    r = await asyncio.to_thread(run_module, env.project, "beyondml.engine.assess",
+                                [kind, pipeline, data, target, out, *extra], ASSESS_TIMEOUT, agent=env.agent, bus=env.bus)
+    if not r["ok"]:
+        lines = (r.get("stderr_tail") or "").strip().splitlines()
+        reason = r.get("error") or ("timed out" if r.get("timed_out") else lines[-1] if lines else f"exit {r['exit_code']}")
+        raise RuntimeError(f"{kind} failed: {reason}")
+    return _jsonable(json.loads(env.project.read(out)))
 
 
 GENERATION_FIELDS = ("gen", "best_fitness", "mean_fitness", "diversity", "evals", "seconds", "best_params")
@@ -278,6 +282,8 @@ def ml_tools(env: ToolEnv) -> list[Callable]:
         df, dropped = _labelled(env, data, target)
         profile = DatasetProfiler(df, target_column=target).run()
         problem = profile["target_analysis"]["target_type"]
+        df, rare = usable_rows(df, target, problem == "classification")
+        dropped += rare
         budget = Budget(max_generations=generations, max_seconds=minutes * 60 if minutes > 0 else None)
         result = await asyncio.to_thread(evolve_tabular, df, target, profile, models=models or None,
                                          pop_size=pop_size, budget=budget, seeds=[_tuples(s) for s in seeds],
@@ -312,6 +318,8 @@ def ml_tools(env: ToolEnv) -> list[Callable]:
         df, dropped = _labelled(env, data, target)
         profile = DatasetProfiler(df, target_column=target).run()
         problem = profile["target_analysis"]["target_type"]
+        df, rare = usable_rows(df, target, problem == "classification")
+        dropped += rare
         X, y = df.drop(columns=[target]), df[target]
 
         def on_trial(stats: dict) -> None:
@@ -341,8 +349,8 @@ def ml_tools(env: ToolEnv) -> list[Callable]:
             kind: stacking or voting.
         """
         report = _load_report(env, run_id, SEARCH_KINDS)
-        df, _ = _labelled(env, report["data"], report["target"])
         classification = report["problem_type"] == "classification"
+        df, _ = usable_rows(_labelled(env, report["data"], report["target"])[0], report["target"], classification)
         members = [_tuples(p) for p in distinct_top(report["population"], top_n)]
         model = build_ensemble(members, report["names"], report["is_numeric"], classification,
                                report["class_weight"], kind)
@@ -425,12 +433,8 @@ def ml_tools(env: ToolEnv) -> list[Callable]:
             test_size: Holdout share.
             seed: Split seed.
         """
-        module = _load_pipeline(env, pipeline)
-        df, _ = _labelled(env, data, target)
-        result = await asyncio.to_thread(assess, module.build_pipeline, df[module.FEATURES], df[target],
-                                         module.PROBLEM == "classification", test_size, seed)
-        result = _jsonable(result)
-        env.project.write("reports/eval.json", json.dumps(result, indent=1))
+        result = await _out_of_process(env, "evaluate", pipeline, data, target, "reports/eval.json",
+                                       "--test-size", str(test_size), "--seed", str(seed))
         _record(env, "evaluate", {result["score_name"]: result["score"], "train_score": result["train_score"],
                                   "gap": result["gap"], "top_share": result["top_share"], "health": result["health"]})
         return {"ok": True, **result}
@@ -447,13 +451,8 @@ def ml_tools(env: ToolEnv) -> list[Callable]:
         """
         import plotly.express as px
 
-        module = _load_pipeline(env, pipeline)
-        df, _ = _labelled(env, data, target)
-        X_train, X_test, y_train, y_test = train_test_split(df[module.FEATURES], df[target], test_size=0.2,
-                                                            random_state=0)
-        model = await asyncio.to_thread(module.build_pipeline().fit, X_train, y_train)
-        result = _jsonable(await asyncio.to_thread(importance, model, X_test, y_test, top_k))
-        env.project.write("reports/importance.json", json.dumps(result, indent=1))
+        result = await _out_of_process(env, "explain", pipeline, data, target, "reports/importance.json",
+                                       "--top-k", str(top_k))
         rel = "reports/charts/importance.json"
         figure = px.bar(pd.DataFrame(result["top"]), x="value", y="feature", orientation="h",
                         title="Feature importance")

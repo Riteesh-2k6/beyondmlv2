@@ -1,5 +1,6 @@
 import builtins
 import json
+import os
 
 import numpy as np
 import pandas as pd
@@ -124,3 +125,40 @@ async def test_cluster_tool(env):
     result = await tools(env)["cluster"]("data/raw/b.csv", algorithms=["kmeans"], pop_size=4, generations=2)
     assert result["ok"], result
     assert env.project.path("data/processed/clusters.csv").exists() and events(env, "generation")
+
+
+async def test_single_row_class_gives_a_clear_error(env):
+    # review 10-24: 29 "no" + 1 "yes" made every candidate fail behind a misleading pool-shutdown error
+    pd.DataFrame({"x": np.arange(30.0), "y": ["no"] * 29 + ["yes"]}).to_csv(
+        env.project.root / "data" / "raw" / "rare.csv", index=False)
+    result = await tools(env)["evolve"]("data/raw/rare.csv", "y", pop_size=3, generations=1)
+    assert result["ok"] is False and "two classes" in result["error"]
+
+
+async def test_single_row_class_is_dropped_and_counted(env, classification_df):
+    df = classification_df.copy()
+    df.loc[0, "target"] = 7  # a third class with one row
+    df.to_csv(env.project.root / "data" / "raw" / "three.csv", index=False)
+    t = tools(env)
+    result = await t["evolve"]("data/raw/three.csv", "target", pop_size=3, generations=1)
+    assert result["ok"] and result["dropped_rows"] == 1
+    exported = t["export_pipeline"](raw="data/raw/three.csv")
+    assert exported["ok"], exported
+    for seed in range(3):
+        evaluated = await t["evaluate"]("data/raw/three.csv", "target", seed=seed)
+        assert evaluated["ok"], evaluated
+
+
+async def test_evaluate_runs_model_code_out_of_process(env, monkeypatch):
+    # review 10-24: evaluate imported the agent-writable pipeline into the harness, secrets and all
+    monkeypatch.setenv("BML_PROBE_SECRET_KEY", "hush")
+    t = tools(env)
+    await t["evolve"]("data/raw/t.csv", "target", pop_size=3, generations=1)
+    t["export_pipeline"]()
+    probe = ("\nimport json as _j, os as _o\nopen('probe.json', 'w').write(_j.dumps("
+             "{'pid': _o.getpid(), 'secret': _o.environ.get('BML_PROBE_SECRET_KEY')}))\n")
+    pipeline = env.project.path("src/pipeline.py")
+    pipeline.write_text(pipeline.read_text(encoding="utf-8") + probe, encoding="utf-8")
+    assert (await t["evaluate"]("data/raw/t.csv", "target"))["ok"]
+    seen = json.loads(env.project.path("probe.json").read_text())
+    assert seen["pid"] != os.getpid() and seen["secret"] is None

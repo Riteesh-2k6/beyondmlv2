@@ -24,7 +24,9 @@ def mk(tmp_path, mode="auto"):
 @pytest.mark.parametrize("mode,tool,script,expected", [
     ("autonomous", "run_python", "import requests", False), ("ask", "run_python", "print(1)", True),
     ("auto", "run_python", "print(1)", False), ("auto", "run_python", "import requests", True),
-    ("auto", "install_package", None, True), ("ask", "read_file", None, False)])
+    ("auto", "install_package", None, True), ("ask", "read_file", None, False),
+    # evaluate and explain run the project's model code, so ask mode confirms them like run_python (review 10-24)
+    ("ask", "evaluate", None, True), ("ask", "explain", None, True), ("auto", "evaluate", None, False)])
 def test_needs_confirmation(mode, tool, script, expected, tmp_path):
     env = mk(tmp_path, mode)
     args = {}

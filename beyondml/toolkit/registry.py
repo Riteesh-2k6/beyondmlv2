@@ -17,8 +17,8 @@ NETWORK = re.compile(r"\b(requests|urllib|httpx|aiohttp|socket|http\.client|ftpl
 def needs_confirmation(env: ToolEnv, tool: str, args: dict) -> bool:
     if env.mode == "autonomous":
         return False
-    if env.mode == "ask":
-        return tool in {"run_python", "install_package"}
+    if env.mode == "ask":  # evaluate and explain run the project's model code, like run_python
+        return tool in {"run_python", "install_package", "evaluate", "explain"}
     if tool == "install_package":
         return True
     if tool == "run_python":
